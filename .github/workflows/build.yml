@@ -1,0 +1,49 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  merge_group:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - build: linux
+          os: ubuntu-latest
+          target: x86_64-unknown-linux-musl
+        - build: macos
+          os: macos-latest
+          target: x86_64-apple-darwin
+        - build: win-msvc
+          os: windows-latest
+          target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        target: ${{ matrix.target }}
+    - uses: Swatinem/rust-cache@v2
+    - name: Install packages (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
+      run: sudo apt-get install -y --no-install-recommends musl-tools
+    - run: eng/build.sh ${{ matrix.target }}
+      shell: bash
+    - uses: actions/upload-artifact@v4
+      if: matrix.os == 'windows-latest'
+      with:
+        name: ${{ matrix.build }}
+        path: target/${{ matrix.target }}/release/az-pim.exe
+        if-no-files-found: error
+    - uses: actions/upload-artifact@v4
+      if: matrix.os != 'windows-latest'
+      with:
+        name: ${{ matrix.build }}
+        path: target/${{ matrix.target }}/release/az-pim
+        if-no-files-found: error
