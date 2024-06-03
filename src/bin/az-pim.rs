@@ -77,16 +77,17 @@ fn main() -> Result<()> {
 
     let args = Cmd::parse();
 
-    let token = get_token().context("unable to obtain access token")?;
-
-    let roles = list(&token)?;
     match args.commands {
         SubCommand::List => {
+            let token = get_token().context("unable to obtain access token")?;
+            let roles = list(&token).context("unable to list available roles in PIM")?;
             serde_json::to_writer_pretty(stdout(), &roles)?;
             Ok(())
         }
         SubCommand::Elevate(config) => {
-            elevate_role(&token, &config, &roles)?;
+            let token = get_token().context("unable to obtain access token")?;
+            let roles = list(&token).context("unable to list available roles in PIM")?;
+            elevate_role(&token, &config, &roles).context("unable to elevate to specified role")?;
             Ok(())
         }
         SubCommand::Readme => {
