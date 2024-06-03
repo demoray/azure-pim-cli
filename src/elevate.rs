@@ -31,7 +31,7 @@ pub fn elevate_role(token: &str, cfg: &ElevateConfig, roles: &[ScopeEntry]) -> R
     let url = format!("https://management.azure.com{}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}", scope.scope);
     let body = serde_json::json!({
         "properties": {
-            "principalId": principal_id.to_string(),
+            "principalId": principal_id,
             "roleDefinitionId": scope.role_definition_id,
             "requestType": "SelfActivate",
             "justification": cfg.justification,

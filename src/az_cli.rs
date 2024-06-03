@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::process::Command;
-use uuid::Uuid;
 
 fn az_cmd(args: &[&str]) -> Result<String> {
     let output = Command::new("az").args(args).output()?;
@@ -20,8 +19,8 @@ pub fn get_token() -> Result<String> {
     ])
 }
 
-pub fn get_userid() -> Result<Uuid> {
-    let as_str = az_cmd(&[
+pub fn get_userid() -> Result<String> {
+    az_cmd(&[
         "ad",
         "signed-in-user",
         "show",
@@ -29,6 +28,5 @@ pub fn get_userid() -> Result<Uuid> {
         "id",
         "--output",
         "tsv",
-    ])?;
-    Ok(Uuid::parse_str(&as_str)?)
+    ])
 }
