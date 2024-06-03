@@ -15,7 +15,7 @@ jobs:
         include:
         - build: linux
           os: ubuntu-latest
-          target: x86_64-unknown-linux-musl
+          target: x86_64-unknown-linux-gnu
         - build: macos
           os: macos-latest
           target: x86_64-apple-darwin
@@ -29,10 +29,6 @@ jobs:
       with:
         target: ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v2
-    - name: Install packages (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      shell: bash
-      run: sudo apt-get install -y --no-install-recommends musl-tools
     - run: eng/build.sh ${{ matrix.target }}
       shell: bash
     - uses: actions/upload-artifact@v4
