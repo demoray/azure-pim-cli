@@ -1,5 +1,9 @@
 use anyhow::{bail, Context, Result};
-use azure_pim_cli::{activate::activate_role, az_cli::get_token, roles::list_roles};
+use azure_pim_cli::{
+    activate::activate_role,
+    az_cli::{get_token, get_userid},
+    roles::list_roles,
+};
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use serde::Deserialize;
 use std::{
@@ -244,6 +248,7 @@ fn main() -> Result<()> {
             justification,
             duration,
         } => {
+            let principal_id = get_userid().context("unable to obtain the current user")?;
             let token = get_token().context("unable to obtain access token")?;
             let roles = list_roles(&token).context("unable to list available roles in PIM")?;
             let entry = roles
@@ -254,6 +259,7 @@ fn main() -> Result<()> {
             info!("activating {role:?} in {}", entry.scope_name);
 
             activate_role(
+                &principal_id,
                 &token,
                 &entry.scope,
                 &entry.role_definition_id,
@@ -287,6 +293,7 @@ fn main() -> Result<()> {
                 bail!("no roles specified");
             }
 
+            let principal_id = get_userid().context("unable to obtain the current user")?;
             let token = get_token().context("unable to obtain access token")?;
             let available = list_roles(&token).context("unable to list available roles in PIM")?;
 
@@ -303,9 +310,14 @@ fn main() -> Result<()> {
             let mut success = true;
             for (scope, role, role_definition_id, scope_name) in to_add {
                 info!("activating {role:?} in {scope_name}");
-                if let Err(error) =
-                    activate_role(&token, scope, role_definition_id, &justification, duration)
-                {
+                if let Err(error) = activate_role(
+                    &principal_id,
+                    &token,
+                    scope,
+                    role_definition_id,
+                    &justification,
+                    duration,
+                ) {
                     error!(
                         "scope: {scope} role_definition_id: {role_definition_id} error: {error:?}"
                     );
