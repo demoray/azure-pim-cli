@@ -1,8 +1,8 @@
 # Azure PIM CLI
 
-```
 CLI to list and enable Azure Privileged Identity Management roles
 
+```
 Usage: az-pim <COMMAND>
 
 Commands:
@@ -13,9 +13,6 @@ Commands:
 Options:
   -h, --help
           Print help
-
-  -V, --version
-          Print version
 
 ```
 ## az-pim list
@@ -28,9 +25,6 @@ Usage: list
 Options:
   -h, --help
           Print help
-
-  -V, --version
-          Print version
 
 ```
 ## az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>
@@ -58,9 +52,6 @@ Options:
 
   -h, --help
           Print help
-
-  -V, --version
-          Print version
 
 ```
 ## az-pim activate-set <JUSTIFICATION>
@@ -94,8 +85,5 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
-
-  -V, --version
-          Print version
 
 ```

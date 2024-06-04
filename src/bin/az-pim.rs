@@ -9,13 +9,7 @@ use std::{
 use tracing::{error, info};
 
 #[derive(Parser)]
-#[command(
-    author,
-    version,
-    propagate_version = true,
-    disable_help_subcommand = true
-)]
-/// CLI to list and enable Azure Privileged Identity Management roles
+#[command(disable_help_subcommand = true)]
 struct Cmd {
     #[clap(subcommand)]
     commands: SubCommand,
