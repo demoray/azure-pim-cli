@@ -1,4 +1,3 @@
-use crate::az_cli::get_userid;
 use anyhow::{bail, Result};
 use reqwest::{blocking::Client, StatusCode};
 use serde_json::Value;
@@ -25,14 +24,13 @@ fn check_error_response(body: &Value) -> Result<()> {
 /// # Errors
 /// Will return `Err` if the request fails or the response is not valid JSON
 pub fn activate_role(
+    principal_id: &str,
     token: &str,
     scope: &str,
     role_definition_id: &str,
     justification: &str,
     duration: u32,
 ) -> Result<()> {
-    let principal_id = get_userid()?;
-
     let request_id = Uuid::new_v4();
     let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
     let body = serde_json::json!({
