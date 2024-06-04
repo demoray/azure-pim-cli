@@ -5,14 +5,57 @@ use serde_json::Value;
 
 #[derive(Serialize)]
 pub struct ScopeEntry {
-    pub name: String,
+    pub role: String,
     pub scope: String,
-    scope_name: String,
+    pub scope_name: String,
     #[serde(skip)]
     pub role_definition_id: String,
 }
 
-pub fn list(token: &str) -> Result<Vec<ScopeEntry>> {
+impl ScopeEntry {
+    // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
+    // that allows further nested nulls
+    #[allow(clippy::indexing_slicing)]
+    fn parse(body: &Value) -> Result<Vec<Self>> {
+        let Some(values) = body["value"].as_array() else {
+            bail!("unable to parse response: missing value array: {body:#?}");
+        };
+
+        let mut results = Vec::new();
+        for entry in values {
+            let Some(role) =
+                entry["properties"]["expandedProperties"]["roleDefinition"]["displayName"].as_str()
+            else {
+                bail!("no role name: {entry:#?}");
+            };
+
+            let Some(scope) = entry["properties"]["expandedProperties"]["scope"]["id"].as_str()
+            else {
+                bail!("no scope id: {entry:#?}");
+            };
+
+            let Some(scope_name) =
+                entry["properties"]["expandedProperties"]["scope"]["displayName"].as_str()
+            else {
+                bail!("no scope name: {entry:#?}");
+            };
+
+            let Some(role_definition_id) = entry["properties"]["roleDefinitionId"].as_str() else {
+                bail!("no role definition id: {entry:#?}");
+            };
+
+            results.push(Self {
+                role: role.to_string(),
+                scope: scope.to_string(),
+                scope_name: scope_name.to_string(),
+                role_definition_id: role_definition_id.to_string(),
+            });
+        }
+        Ok(results)
+    }
+}
+
+pub fn list_roles(token: &str) -> Result<Vec<ScopeEntry>> {
     let url = "https://management.azure.com/providers/Microsoft.Authorization/roleEligibilityScheduleInstances";
     let response = Client::new()
         .get(url)
@@ -20,40 +63,5 @@ pub fn list(token: &str) -> Result<Vec<ScopeEntry>> {
         .bearer_auth(token)
         .send()?
         .error_for_status()?;
-    let body: Value = response.json()?;
-    let Some(values) = body["value"].as_array() else {
-        bail!("unable to parse response: missing value array: {body:#?}");
-    };
-
-    let mut results = Vec::new();
-    for role in values {
-        let Some(name) =
-            role["properties"]["expandedProperties"]["roleDefinition"]["displayName"].as_str()
-        else {
-            bail!("no role name: {role:#?}");
-        };
-
-        let Some(scope) = role["properties"]["expandedProperties"]["scope"]["id"].as_str() else {
-            bail!("no scope id: {role:#?}");
-        };
-
-        let Some(scope_name) =
-            role["properties"]["expandedProperties"]["scope"]["displayName"].as_str()
-        else {
-            bail!("no scope name: {role:#?}");
-        };
-
-        let Some(role_definition_id) = role["properties"]["roleDefinitionId"].as_str() else {
-            bail!("no role definition id: {role:#?}");
-        };
-
-        results.push(ScopeEntry {
-            name: name.to_string(),
-            scope: scope.to_string(),
-            scope_name: scope_name.to_string(),
-            role_definition_id: role_definition_id.to_string(),
-        });
-    }
-
-    Ok(results)
+    ScopeEntry::parse(&response.json()?)
 }
