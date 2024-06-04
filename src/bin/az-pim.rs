@@ -48,9 +48,7 @@ $ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-
 2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 "#,
             ),
-            _ => {
-                None
-            }
+            _ => None,
         }
     }
 }
