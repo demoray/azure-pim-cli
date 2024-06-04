@@ -1,5 +1,5 @@
 [package]
-authors = ["Brian Caswell <bcaswell@microsoft.com>"]
+authors = ["Brian Caswell <bcaswell@gmail.com>"]
 name = "azure-pim-cli"
 version = "0.0.1"
 edition = "2021"
