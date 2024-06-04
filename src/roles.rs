@@ -55,6 +55,10 @@ impl ScopeEntry {
     }
 }
 
+/// List the roles available to the current user
+///
+/// # Errors
+/// Will return `Err` if the request fails or the response is not valid JSON
 pub fn list_roles(token: &str) -> Result<Vec<ScopeEntry>> {
     let url = "https://management.azure.com/providers/Microsoft.Authorization/roleEligibilityScheduleInstances";
     let response = Client::new()

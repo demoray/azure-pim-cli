@@ -20,6 +20,10 @@ fn check_error_response(body: &Value) -> Result<()> {
     bail!("unable to elevate: {body:#?}");
 }
 
+/// Activates the specified role
+///
+/// # Errors
+/// Will return `Err` if the request fails or the response is not valid JSON
 pub fn activate_role(
     token: &str,
     scope: &str,
