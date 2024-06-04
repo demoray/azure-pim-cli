@@ -49,7 +49,6 @@ $ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-
 "#,
             ),
             _ => {
-                eprintln!("unknown command {args}");
                 None
             }
         }
