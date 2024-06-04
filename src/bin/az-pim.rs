@@ -16,9 +16,10 @@ struct Cmd {
 }
 
 impl Cmd {
-    fn example(args: &str) -> Option<&'static str> {
-        match args {
-            "azure-pim-cli list" => Some(
+    fn example(cmd: &str) -> Option<&'static str> {
+        match cmd {
+            "az-pim" => None,
+            "az-pim list" => Some(
                 r#"
 $ az-pim list
 [
@@ -33,22 +34,41 @@ $ az-pim list
     "scope_name": "contoso-development-2",
   }
 ]
-                "#,
+$
+"#,
             ),
-            "azure-pim-cli activate <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
+            "az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
                 r#"
 $ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
 2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+$
 "#,
             ),
-            "azure-pim-cli activate-set <JUSTIFICATION>" => Some(
+            "az-pim activate-set <JUSTIFICATION>" => Some(
                 r#"
+$ # specifying multiple roles using a configuration file
+$ az-pim activate-set "deploying new code" --config roles.json
+2024-06-04T15:22:03.1051Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+2024-06-04T15:22:07.25Z    INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+$ cat roles.json
+[
+  {
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "role": "Storage Blob Data Contributor"
+  },
+  {
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "role": "Storage Blob Data Contributor"
+  }
+]
+$ # specifying multiple roles via the command line
 $ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor"
 2024-06-04T15:21:39.9341Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
 2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+$
 "#,
             ),
-            _ => None,
+            unsupported => unimplemented!("unable to generate example for {unsupported}"),
         }
     }
 }
@@ -133,9 +153,9 @@ where
 
 fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
     let mut readme = String::new();
-    let base_name = cmd.get_name().to_owned();
+    let current = cmd.get_name().replace("azure-pim-cli", "az-pim");
 
-    names.push(base_name);
+    names.push(current);
 
     // add positions to the display name if there are any
     for positional in cmd.get_positionals() {
@@ -151,7 +171,11 @@ fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
         readme.push('#');
     }
 
-    let long_help = cmd.render_long_help().to_string().replace("```", "\n```\n");
+    let long_help = cmd
+        .render_long_help()
+        .to_string()
+        .replace("azure-pim-cli", "az-pim")
+        .replace("```", "\n```\n");
     readme.push_str(&format!(" {name}\n\n```\n{long_help}\n```\n",));
 
     if let Some(example) = Cmd::example(&name) {
@@ -173,7 +197,6 @@ fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
 fn build_readme() {
     let mut cmd = Cmd::command();
     let readme = build_readme_entry(&mut cmd, Vec::new())
-        .replace("azure-pim-cli", "az-pim")
         .replacen(
             "# az-pim",
             &format!("# Azure PIM CLI\n\n{}", env!("CARGO_PKG_DESCRIPTION")),
