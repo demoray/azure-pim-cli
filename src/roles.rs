@@ -3,7 +3,7 @@ use reqwest::blocking::Client;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq)]
 pub struct ScopeEntry {
     pub role: String,
     pub scope: String,
@@ -51,6 +51,7 @@ impl ScopeEntry {
                 role_definition_id: role_definition_id.to_string(),
             });
         }
+        results.sort();
         Ok(results)
     }
 }
