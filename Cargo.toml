@@ -1,6 +1,7 @@
 [package]
 authors = ["Brian Caswell <bcaswell@gmail.com>"]
 name = "azure-pim-cli"
+description = "CLI to list and enable Azure Privileged Identity Management roles"
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
