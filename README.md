@@ -1,6 +1,6 @@
 # Azure PIM CLI
 
-CLI to list and enable Azure Privileged Identity Management roles
+Unofficial CLI to list and enable Azure Privileged Identity Management (PIM) roles
 
 ```
 Usage: az-pim <COMMAND>
@@ -43,6 +43,7 @@ $ az-pim list
     "scope_name": "contoso-development-2",
   }
 ]
+$
 
 ```
 
@@ -82,6 +83,7 @@ Options:
 
 $ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
 2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+$
 
 ```
 
@@ -121,8 +123,25 @@ Options:
 ### Example Usage
 ```
 
+$ # specifying multiple roles using a configuration file
+$ az-pim activate-set "deploying new code" --config roles.json
+2024-06-04T15:22:03.1051Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+2024-06-04T15:22:07.25Z    INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+$ cat roles.json
+[
+  {
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "role": "Storage Blob Data Contributor"
+  },
+  {
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "role": "Storage Blob Data Contributor"
+  }
+]
+$ # specifying multiple roles via the command line
 $ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor"
 2024-06-04T15:21:39.9341Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
 2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+$
 
 ```
