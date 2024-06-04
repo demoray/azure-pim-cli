@@ -65,6 +65,10 @@ $ # specifying multiple roles via the command line
 $ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor"
 2024-06-04T15:21:39.9341Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
 2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+$ # use `jq` to select roles to activate from the current role assignments
+$ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activate-set "deploying new code" --config /dev/stdin
+2024-06-04T18:47:15.489917Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+2024-06-04T18:47:20.510941Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 $
 "#,
             ),
