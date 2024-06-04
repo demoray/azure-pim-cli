@@ -40,7 +40,7 @@ enum SubCommand {
     },
 
     /// Activate a set of roles
-    /// 
+    ///
     /// This command can be used to activate multiple roles at once.  It can be
     /// used with a config file or by specifying roles on the command line.
     ActivateSet {
@@ -53,16 +53,18 @@ enum SubCommand {
         /// Path to a JSON config file containing a set of roles to elevate
         ///
         /// Example config file:
-        /// [
-        ///     {
-        ///         "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-        ///         "role": "Owner"
-        ///     },
-        ///     {
-        ///         "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
-        ///         "role": "Owner"
-        ///     }
-        /// ]
+        /// `
+        ///     [
+        ///         {
+        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+        ///             "role": "Owner"
+        ///         },
+        ///         {
+        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+        ///             "role": "Owner"
+        ///         }
+        ///     ]
+        /// `
         config: Option<PathBuf>,
         #[clap(long, conflicts_with = "config", value_name = "SCOPE=NAME", value_parser = parse_key_val::<String, String>, action = clap::ArgAction::Append)]
         /// Specify a role to elevate
@@ -93,7 +95,7 @@ where
     }
 }
 
-fn build_readme(cmd: &mut Command, mut names: Vec<String>) -> String {
+fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
     let mut readme = String::new();
     let base_name = cmd.get_name().to_owned();
 
@@ -121,9 +123,26 @@ fn build_readme(cmd: &mut Command, mut names: Vec<String>) -> String {
         if cmd.get_name() == "readme" {
             continue;
         }
-        readme.push_str(&build_readme(cmd, names.clone()));
+        readme.push_str(&build_readme_entry(cmd, names.clone()));
     }
     readme
+}
+
+fn build_readme() {
+    let mut cmd = Cmd::command();
+    let readme = build_readme_entry(&mut cmd, Vec::new())
+        .replace("azure-pim-cli", "az-pim")
+        .replacen(
+            "# az-pim",
+            &format!("# Azure PIM CLI\n\n{}", env!("CARGO_PKG_DESCRIPTION")),
+            1,
+        )
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .replace("\n\n\n", "\n");
+    print!("{readme}");
 }
 
 #[derive(Deserialize)]
@@ -191,8 +210,7 @@ fn main() -> Result<()> {
                 .collect::<BTreeSet<_>>();
 
             if let Some(path) = config {
-                let handle =
-                    File::open(&path).context("unable to open activate-set config file")?;
+                let handle = File::open(path).context("unable to open activate-set config file")?;
                 let Roles(roles) =
                     serde_json::from_reader(handle).context("unable to parse config file")?;
                 for entry in roles {
@@ -237,20 +255,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         SubCommand::Readme => {
-            let mut cmd = Cmd::command();
-            let readme = build_readme(&mut cmd, Vec::new())
-                .replace("azure-pim-cli", "az-pim")
-                .replacen(
-                    "# az-pim",
-                    &format!("# Azure PIM CLI\n\n{}", env!("CARGO_PKG_DESCRIPTION")),
-                    1,
-                )
-                .lines()
-                .map(str::trim_end)
-                .collect::<Vec<_>>()
-                .join("\n")
-                .replace("\n\n\n", "\n");
-            print!("{readme}");
+            build_readme();
             Ok(())
         }
     }

@@ -16,7 +16,7 @@ impl ScopeEntry {
     // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
     // that allows further nested nulls
     #[allow(clippy::indexing_slicing)]
-    fn parse(body: Value) -> Result<Vec<Self>> {
+    fn parse(body: &Value) -> Result<Vec<Self>> {
         let Some(values) = body["value"].as_array() else {
             bail!("unable to parse response: missing value array: {body:#?}");
         };
@@ -63,6 +63,5 @@ pub fn list_roles(token: &str) -> Result<Vec<ScopeEntry>> {
         .bearer_auth(token)
         .send()?
         .error_for_status()?;
-    let body: Value = response.json()?;
-    ScopeEntry::parse(body)
+    ScopeEntry::parse(&response.json()?)
 }

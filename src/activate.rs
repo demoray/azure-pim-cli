@@ -8,7 +8,7 @@ use uuid::Uuid;
 // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
 // that allows further nested nulls
 #[allow(clippy::indexing_slicing)]
-fn check_error_response(body: Value) -> Result<()> {
+fn check_error_response(body: &Value) -> Result<()> {
     if body["error"]["code"].as_str() == Some("RoleAssignmentExists") {
         info!("role already assigned");
         return Ok(());
@@ -56,7 +56,7 @@ pub fn activate_role(
     let status = response.status();
 
     if status == StatusCode::BAD_REQUEST {
-        return check_error_response(response.json()?);
+        return check_error_response(&response.json()?);
     }
 
     let body: Value = response.error_for_status()?.json()?;
