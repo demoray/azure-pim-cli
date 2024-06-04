@@ -27,11 +27,34 @@ Options:
           Print help
 
 ```
+### Example Usage
+```
+
+$ az-pim list
+[
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "contoso-development",
+  },
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope_name": "contoso-development-2",
+  }
+]
+
+```
+
 ## az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>
 
 ```
 Activate a specific role
 
+Example usage:
+```
+
+```
 Usage: activate [OPTIONS] <ROLE> <SCOPE> <JUSTIFICATION>
 
 Arguments:
@@ -51,9 +74,17 @@ Options:
           [default: 480]
 
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
 ```
+### Example Usage
+```
+
+$ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
+2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+
+```
+
 ## az-pim activate-set <JUSTIFICATION>
 
 ```
@@ -85,5 +116,13 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+
+```
+### Example Usage
+```
+
+$ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor"
+2024-06-04T15:21:39.9341Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 
 ```

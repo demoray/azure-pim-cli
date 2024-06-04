@@ -15,12 +15,54 @@ struct Cmd {
     commands: SubCommand,
 }
 
+impl Cmd {
+    fn example(args: &str) -> Option<&'static str> {
+        match args {
+            "azure-pim-cli list" => Some(
+                r#"
+$ az-pim list
+[
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "contoso-development",
+  },
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope_name": "contoso-development-2",
+  }
+]
+                "#,
+            ),
+            "azure-pim-cli activate <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
+                r#"
+$ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
+2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+"#,
+            ),
+            "azure-pim-cli activate-set <JUSTIFICATION>" => Some(
+                r#"
+$ az-pim activate-set "deploying new code" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor" --role "/subscriptions/00000000-0000-0000-0000-000000000001=Storage Blob Data Contributor"
+2024-06-04T15:21:39.9341Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+"#,
+            ),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum SubCommand {
     /// List eligible assignments
     List,
 
     /// Activate a specific role
+    ///
+    /// Example usage:
+    /// ```
+    /// ```
     Activate {
         /// Name of the role to elevate
         role: String,
@@ -104,14 +146,20 @@ fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
 
     // once we're at 6 levels of nesting, don't nest anymore.  This is the max
     // that shows up on crates.io and GitHub.
-    for _ in 0..(min(names.iter().filter(|f| !f.starts_with('<')).count(), 6)) {
+    let depth = min(names.iter().filter(|f| !f.starts_with('<')).count(), 5);
+    for _ in 0..depth {
         readme.push('#');
     }
 
-    readme.push_str(&format!(
-        " {name}\n\n```\n{}\n```\n",
-        cmd.render_long_help()
-    ));
+    let long_help = cmd.render_long_help().to_string().replace("```", "\n```\n");
+    readme.push_str(&format!(" {name}\n\n```\n{long_help}\n```\n",));
+
+    if let Some(example) = Cmd::example(&name) {
+        for _ in 0..=depth {
+            readme.push('#');
+        }
+        readme.push_str(&format!(" Example Usage\n```\n{example}\n```\n\n"));
+    }
 
     for cmd in cmd.get_subcommands_mut() {
         if cmd.get_name() == "readme" {
