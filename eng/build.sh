@@ -9,6 +9,10 @@ cd $(dirname ${BASH_SOURCE[0]})/../
 
 which typos || cargo install typos-cli
 
+if [[ ${OSTYPE} == "linux-gnu"* ]]; then
+    which cargo-deb || cargo install cargo-deb
+fi
+
 BUILD_COMMON="--locked --profile ${BUILD_PROFILE}"
 if [ x"${BUILD_TARGET}" != x"" ]; then
     BUILD_COMMON="${BUILD_COMMON} --target ${BUILD_TARGET}"
@@ -22,3 +26,7 @@ cargo build ${BUILD_COMMON}
 cargo test ${BUILD_COMMON}
 cargo run ${BUILD_COMMON} -- readme > README.md
 git diff --exit-code README.md
+
+if [[ ${OSTYPE} == "linux-gnu"* ]]; then
+    cargo deb
+fi
