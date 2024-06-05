@@ -19,7 +19,7 @@ jobs:
           os: ubuntu-24.04
         - build: macos
           os: macos-latest
-        - build: win-msvc
+        - build: windows
           os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
