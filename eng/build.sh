@@ -2,9 +2,6 @@
 
 set -uvex -o pipefail
 
-BUILD_TARGET=${1:-""}
-BUILD_PROFILE=${2:-"release"}
-
 cd $(dirname ${BASH_SOURCE[0]})/../
 
 which typos || cargo install typos-cli
@@ -13,10 +10,7 @@ if [[ ${OSTYPE} == "linux-gnu"* ]]; then
     which cargo-deb || cargo install cargo-deb
 fi
 
-BUILD_COMMON="--locked --profile ${BUILD_PROFILE}"
-if [ x"${BUILD_TARGET}" != x"" ]; then
-    BUILD_COMMON="${BUILD_COMMON} --target ${BUILD_TARGET}"
-fi
+BUILD_COMMON="--locked --profile release"
 
 typos
 cargo clippy ${BUILD_COMMON} --all-targets --all-features -- -D warnings -D clippy::pedantic -A clippy::missing_errors_doc -A clippy::module_name_repetitions

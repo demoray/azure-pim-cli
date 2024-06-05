@@ -15,43 +15,36 @@ jobs:
         include:
         - build: ubuntu-20.04
           os: ubuntu-20.04
-          target: x86_64-unknown-linux-gnu
         - build: ubuntu-22.04
           os: ubuntu-22.04
-          target: x86_64-unknown-linux-gnu
         - build: ubuntu-24.04
           os: ubuntu-24.04
-          target: x86_64-unknown-linux-gnu
         - build: macos
           os: macos-latest
-          target: x86_64-apple-darwin
         - build: win-msvc
           os: windows-latest
-          target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-      with:
-        target: ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v2
-    - run: eng/build.sh ${{ matrix.target }}
+    - run: eng/build.sh
       shell: bash
     - uses: actions/upload-artifact@v4
       if: matrix.os == 'windows-latest'
       with:
         name: ${{ matrix.build }}
-        path: target/${{ matrix.target }}/release/az-pim.exe
+        path: target/release/az-pim.exe
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
       if: matrix.os == 'macos-latest'
       with:
         name: ${{ matrix.build }}
-        path: target/${{ matrix.target }}/release/az-pim
+        path: target/release/az-pim
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
       if: startsWith(matrix.os, 'ubuntu-')
       with:
         name: ${{ matrix.build }}
-        path: target/${{ matrix.target }}/debian/*.deb
+        path: target/debian/*.deb
         if-no-files-found: error
