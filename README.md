@@ -9,6 +9,7 @@ Commands:
   list          List eligible assignments
   activate      Activate a specific role
   activate-set  Activate a set of roles
+  init          Setup shell tab completions
 
 Options:
   -h, --help
@@ -28,8 +29,8 @@ Options:
 
 ```
 ### Example Usage
-```
 
+```
 $ az-pim list
 [
   {
@@ -44,7 +45,6 @@ $ az-pim list
   }
 ]
 $
-
 ```
 
 ## az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>
@@ -79,12 +79,11 @@ Options:
 
 ```
 ### Example Usage
-```
 
+```
 $ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
 2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
 $
-
 ```
 
 ## az-pim activate-set <JUSTIFICATION>
@@ -121,8 +120,8 @@ Options:
 
 ```
 ### Example Usage
-```
 
+```
 $ # specifying multiple roles using a configuration file
 $ az-pim activate-set "deploying new code" --config roles.json
 2024-06-04T15:22:03.1051Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
@@ -147,5 +146,29 @@ $ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activ
 2024-06-04T18:47:15.489917Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
 2024-06-04T18:47:20.510941Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 $
+```
 
+## az-pim init <SHELL>
+
+```
+Setup shell tab completions
+
+This command will generate shell completions for the specified shell.
+
+Usage: init <SHELL>
+
+Arguments:
+  <SHELL>
+          [possible values: bash, elvish, fish, powershell, zsh]
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+### Example Usage
+
+```
+* bash: `eval $(az-pim init bash)`
+* zsh: `source <(az-pim init zsh)`
 ```

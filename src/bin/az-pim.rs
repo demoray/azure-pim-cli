@@ -1,10 +1,11 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use azure_pim_cli::{
     activate::activate_role,
     az_cli::{get_token, get_userid},
     roles::list_roles,
 };
 use clap::{Command, CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
 use serde::Deserialize;
 use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
@@ -13,16 +14,22 @@ use std::{
 use tracing::{error, info};
 
 #[derive(Parser)]
-#[command(disable_help_subcommand = true)]
+#[command(disable_help_subcommand = true, name = "az-pim")]
 struct Cmd {
     #[clap(subcommand)]
-    commands: SubCommand,
+    command: SubCommand,
 }
 
 impl Cmd {
+    fn shell_completion(shell: Shell) {
+        let mut cmd = Self::command();
+        let name = cmd.get_name().to_string();
+        generate(shell, &mut cmd, name, &mut stdout());
+    }
+
     fn example(cmd: &str) -> Option<&'static str> {
         match cmd {
-            "az-pim" => None,
+            "az-pim" | "az-pim generate" => None,
             "az-pim list" => Some(
                 r#"
 $ az-pim list
@@ -75,6 +82,12 @@ $ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activ
 2024-06-04T18:47:20.510941Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 $
 "#,
+            ),
+            "az-pim init <SHELL>" => Some(
+                r"
+* bash: `eval $(az-pim init bash)`
+* zsh: `source <(az-pim init zsh)`
+",
             ),
             unsupported => unimplemented!("unable to generate example for {unsupported}"),
         }
@@ -137,7 +150,13 @@ enum SubCommand {
         role: Option<Vec<(String, String)>>,
     },
 
+    /// Setup shell tab completions
+    ///
+    /// This command will generate shell completions for the specified shell.
+    Init { shell: Shell },
+
     #[command(hide = true)]
+    /// Generate the README.md file dynamically
     Readme,
 }
 
@@ -161,7 +180,7 @@ where
 
 fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
     let mut readme = String::new();
-    let current = cmd.get_name().replace("azure-pim-cli", "az-pim");
+    let current = cmd.get_name().to_string();
 
     names.push(current);
 
@@ -179,18 +198,17 @@ fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
         readme.push('#');
     }
 
-    let long_help = cmd
-        .render_long_help()
-        .to_string()
-        .replace("azure-pim-cli", "az-pim")
-        .replace("```", "\n```\n");
+    let long_help = cmd.render_long_help().to_string().replace("```", "\n```\n");
     readme.push_str(&format!(" {name}\n\n```\n{long_help}\n```\n",));
 
     if let Some(example) = Cmd::example(&name) {
         for _ in 0..=depth {
             readme.push('#');
         }
-        readme.push_str(&format!(" Example Usage\n```\n{example}\n```\n\n"));
+        readme.push_str(&format!(
+            " Example Usage\n\n```\n{}\n```\n\n",
+            example.trim()
+        ));
     }
 
     for cmd in cmd.get_subcommands_mut() {
@@ -239,7 +257,7 @@ fn main() -> Result<()> {
 
     let args = Cmd::parse();
 
-    match args.commands {
+    match args.command {
         SubCommand::List => {
             let token = get_token().context("unable to obtain access token")?;
             let roles = list_roles(&token).context("unable to list available roles in PIM")?;
@@ -322,21 +340,21 @@ fn main() -> Result<()> {
                     &justification,
                     duration,
                 ) {
-                    error!(
-                        "scope: {scope} role_definition_id: {role_definition_id} error: {error:?}"
-                    );
+                    error!("scope: {scope} definition: {role_definition_id} error: {error:?}");
                     success = false;
                 }
             }
 
-            if !success {
-                bail!("unable to elevate to all roles");
-            }
+            ensure!(success, "unable to elevate to all roles");
 
             Ok(())
         }
         SubCommand::Readme => {
             build_readme();
+            Ok(())
+        }
+        SubCommand::Init { shell } => {
+            Cmd::shell_completion(shell);
             Ok(())
         }
     }
