@@ -316,17 +316,14 @@ fn activate_set(
     justification: &str,
     duration: u32,
 ) -> Result<()> {
-    let mut desired_roles = role
-        .unwrap_or_default()
-        .into_iter()
-        .collect::<BTreeSet<_>>();
+    let mut desired_roles = role.unwrap_or_default();
 
     if let Some(path) = config {
         let handle = File::open(path).context("unable to open activate-set config file")?;
         let Roles(roles) =
             serde_json::from_reader(handle).context("unable to parse config file")?;
         for entry in roles {
-            desired_roles.insert((entry.role, entry.scope));
+            desired_roles.push((entry.role, entry.scope));
         }
     }
 
