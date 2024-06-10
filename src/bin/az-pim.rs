@@ -1,8 +1,8 @@
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     activate::activate_role,
     az_cli::{get_token, get_userid},
-    roles::list_roles,
+    roles::{list_roles, Role, Scope},
 };
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
@@ -52,6 +52,8 @@ $
                 r#"
 $ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
 2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+$ az-pim activate "Storage Blob Data Contributor" "contoso-development-2" "accessing storage data"
+2024-06-04T15:35:54.714131Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 $
 "#,
             ),
@@ -68,7 +70,7 @@ $ cat roles.json
     "role": "Storage Blob Data Contributor"
   },
   {
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope": "contoso-development-2",
     "role": "Storage Blob Data Contributor"
   }
 ]
@@ -106,9 +108,9 @@ enum SubCommand {
     /// ```
     Activate {
         /// Name of the role to elevate
-        role: String,
+        role: Role,
         /// Scope to elevate
-        scope: String,
+        scope: Scope,
         /// Justification for the request
         justification: String,
         /// Duration in minutes
@@ -133,21 +135,27 @@ enum SubCommand {
         /// `
         ///     [
         ///         {
-        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-        ///             "role": "Owner"
+        ///             "role": "Owner",
+        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000000"
         ///         },
         ///         {
-        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
-        ///             "role": "Owner"
+        ///             "role": "Owner",
+        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000001"
         ///         }
         ///     ]
         /// `
         config: Option<PathBuf>,
-        #[clap(long, conflicts_with = "config", value_name = "SCOPE=NAME", value_parser = parse_key_val::<String, String>, action = clap::ArgAction::Append)]
+        #[clap(
+            long,
+            conflicts_with = "config",
+            value_name = "ROLE=SCOPE",
+            value_parser = parse_key_val::<String, String>,
+            action = clap::ArgAction::Append
+        )]
         /// Specify a role to elevate
         ///
         /// Specify multiple times to include multiple key/value pairs
-        role: Option<Vec<(String, String)>>,
+        role: Option<Vec<(Role, Scope)>>,
     },
 
     /// Setup shell tab completions
@@ -237,13 +245,13 @@ fn build_readme() {
 }
 
 #[derive(Deserialize)]
-struct Role {
-    scope: String,
-    role: String,
+struct ElevateEntry {
+    role: Role,
+    scope: Scope,
 }
 
 #[derive(Deserialize)]
-struct Roles(Vec<Role>);
+struct Roles(Vec<ElevateEntry>);
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -258,97 +266,19 @@ fn main() -> Result<()> {
     let args = Cmd::parse();
 
     match args.command {
-        SubCommand::List => {
-            let token = get_token().context("unable to obtain access token")?;
-            let roles = list_roles(&token).context("unable to list available roles in PIM")?;
-            serde_json::to_writer_pretty(stdout(), &roles)?;
-            Ok(())
-        }
+        SubCommand::List => list(),
         SubCommand::Activate {
             role,
             scope,
             justification,
             duration,
-        } => {
-            let principal_id = get_userid().context("unable to obtain the current user")?;
-            let token = get_token().context("unable to obtain access token")?;
-            let roles = list_roles(&token).context("unable to list available roles in PIM")?;
-            let entry = roles
-                .iter()
-                .find(|v| v.role == role && v.scope == scope)
-                .context("role not found")?;
-
-            info!("activating {role:?} in {}", entry.scope_name);
-
-            activate_role(
-                &principal_id,
-                &token,
-                &entry.scope,
-                &entry.role_definition_id,
-                &justification,
-                duration,
-            )
-            .context("unable to elevate to specified role")?;
-            Ok(())
-        }
+        } => activate(&role, &scope, &justification, duration),
         SubCommand::ActivateSet {
             config,
             role,
             justification,
             duration,
-        } => {
-            let mut desired_roles = role
-                .unwrap_or_default()
-                .into_iter()
-                .collect::<BTreeSet<_>>();
-
-            if let Some(path) = config {
-                let handle = File::open(path).context("unable to open activate-set config file")?;
-                let Roles(roles) =
-                    serde_json::from_reader(handle).context("unable to parse config file")?;
-                for entry in roles {
-                    desired_roles.insert((entry.scope, entry.role));
-                }
-            }
-
-            if desired_roles.is_empty() {
-                bail!("no roles specified");
-            }
-
-            let principal_id = get_userid().context("unable to obtain the current user")?;
-            let token = get_token().context("unable to obtain access token")?;
-            let available = list_roles(&token).context("unable to list available roles in PIM")?;
-
-            let mut to_add = BTreeSet::new();
-            for (scope, role) in &desired_roles {
-                let entry = &available
-                    .iter()
-                    .find(|v| &v.role == role && &v.scope == scope)
-                    .with_context(|| format!("role not found.  role:{role} scope:{scope}"))?;
-
-                to_add.insert((scope, role, &entry.role_definition_id, &entry.scope_name));
-            }
-
-            let mut success = true;
-            for (scope, role, role_definition_id, scope_name) in to_add {
-                info!("activating {role:?} in {scope_name}");
-                if let Err(error) = activate_role(
-                    &principal_id,
-                    &token,
-                    scope,
-                    role_definition_id,
-                    &justification,
-                    duration,
-                ) {
-                    error!("scope: {scope} definition: {role_definition_id} error: {error:?}");
-                    success = false;
-                }
-            }
-
-            ensure!(success, "unable to elevate to all roles");
-
-            Ok(())
-        }
+        } => activate_set(config, role, &justification, duration),
         SubCommand::Readme => {
             build_readme();
             Ok(())
@@ -358,4 +288,75 @@ fn main() -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn list() -> Result<()> {
+    let token = get_token().context("unable to obtain access token")?;
+    let roles = list_roles(&token).context("unable to list available roles in PIM")?;
+    serde_json::to_writer_pretty(stdout(), &roles)?;
+    Ok(())
+}
+
+fn activate(role: &Role, scope: &Scope, justification: &str, duration: u32) -> Result<()> {
+    let principal_id = get_userid().context("unable to obtain the current user")?;
+    let token = get_token().context("unable to obtain access token")?;
+    let roles = list_roles(&token).context("unable to list available roles in PIM")?;
+    let entry = roles.find(role, scope).context("role not found")?;
+
+    info!("activating {role:?} in {}", entry.scope_name);
+
+    activate_role(&principal_id, &token, entry, justification, duration)
+        .context("unable to elevate to specified role")?;
+    Ok(())
+}
+
+fn activate_set(
+    config: Option<PathBuf>,
+    role: Option<Vec<(Role, Scope)>>,
+    justification: &str,
+    duration: u32,
+) -> Result<()> {
+    let mut desired_roles = role
+        .unwrap_or_default()
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+
+    if let Some(path) = config {
+        let handle = File::open(path).context("unable to open activate-set config file")?;
+        let Roles(roles) =
+            serde_json::from_reader(handle).context("unable to parse config file")?;
+        for entry in roles {
+            desired_roles.insert((entry.role, entry.scope));
+        }
+    }
+
+    ensure!(!desired_roles.is_empty(), "no roles specified");
+
+    let principal_id = get_userid().context("unable to obtain the current user")?;
+    let token = get_token().context("unable to obtain access token")?;
+    let available = list_roles(&token).context("unable to list available roles in PIM")?;
+
+    let mut to_add = BTreeSet::new();
+    for (role, scope) in &desired_roles {
+        let entry = available
+            .find(role, scope)
+            .with_context(|| format!("role not found.  role:{role} scope:{scope}"))?;
+        to_add.insert(entry);
+    }
+
+    let mut success = true;
+    for entry in to_add {
+        info!("activating {} in {}", entry.role, entry.scope_name);
+        if let Err(error) = activate_role(&principal_id, &token, entry, justification, duration) {
+            error!(
+                "scope: {} definition: {} error: {error:?}",
+                entry.scope, entry.role_definition_id
+            );
+            success = false;
+        }
+    }
+
+    ensure!(success, "unable to elevate to all roles");
+
+    Ok(())
 }

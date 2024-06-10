@@ -83,6 +83,8 @@ Options:
 ```
 $ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
 2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
+$ az-pim activate "Storage Blob Data Contributor" "contoso-development-2" "accessing storage data"
+2024-06-04T15:35:54.714131Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 $
 ```
 
@@ -108,9 +110,9 @@ Options:
       --config <CONFIG>
           Path to a JSON config file containing a set of roles to elevate
 
-          Example config file: ` [ { "scope": "/subscriptions/00000000-0000-0000-0000-000000000000", "role": "Owner" }, { "scope": "/subscriptions/00000000-0000-0000-0000-000000000001", "role": "Owner" } ] `
+          Example config file: ` [ { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000000" }, { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000001" } ] `
 
-      --role <SCOPE=NAME>
+      --role <ROLE=SCOPE>
           Specify a role to elevate
 
           Specify multiple times to include multiple key/value pairs
@@ -133,7 +135,7 @@ $ cat roles.json
     "role": "Storage Blob Data Contributor"
   },
   {
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope": "contoso-development-2",
     "role": "Storage Blob Data Contributor"
   }
 ]
