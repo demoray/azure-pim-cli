@@ -1,3 +1,4 @@
+use crate::roles::ScopeEntry;
 use anyhow::{bail, Result};
 use reqwest::{blocking::Client, StatusCode};
 use serde_json::Value;
@@ -26,22 +27,21 @@ fn check_error_response(body: &Value) -> Result<()> {
 pub fn activate_role(
     principal_id: &str,
     token: &str,
-    scope: &str,
-    role_definition_id: &str,
+    entry: &ScopeEntry,
     justification: &str,
     duration: u32,
 ) -> Result<()> {
     let request_id = Uuid::new_v4();
-    let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
+    let url = format!("https://management.azure.com{}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}", entry.scope);
     let body = serde_json::json!({
         "properties": {
             "principalId": principal_id,
-            "roleDefinitionId": role_definition_id,
+            "roleDefinitionId": entry.role_definition_id,
             "requestType": "SelfActivate",
             "justification": justification,
             "scheduleInfo": {
                 "expiration": {
-                    "duration": format!("PT{}M", duration),
+                    "duration": format!("PT{duration}M"),
                     "type": "AfterDuration",
                 }
             }
