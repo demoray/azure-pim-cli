@@ -30,13 +30,18 @@ pub fn activate_role(
     entry: &ScopeEntry,
     justification: &str,
     duration: u32,
-) -> Result<()> {
+) -> Result<Option<Uuid>> {
+    let ScopeEntry {
+        scope,
+        role_definition_id,
+        ..
+    } = entry;
     let request_id = Uuid::new_v4();
-    let url = format!("https://management.azure.com{}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}", entry.scope);
+    let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
     let body = serde_json::json!({
         "properties": {
             "principalId": principal_id,
-            "roleDefinitionId": entry.role_definition_id,
+            "roleDefinitionId": role_definition_id,
             "requestType": "SelfActivate",
             "justification": justification,
             "scheduleInfo": {
@@ -58,13 +63,12 @@ pub fn activate_role(
     let status = response.status();
 
     if status == StatusCode::BAD_REQUEST {
-        return check_error_response(&response.json()?);
+        check_error_response(&response.json()?)?;
+        return Ok(None);
     }
 
     let body: Value = response.error_for_status()?.json()?;
 
     debug!("body: {status:#?} - {body:#?}");
-    info!("submitted request: {request_id}");
-
-    Ok(())
+    Ok(Some(request_id))
 }
