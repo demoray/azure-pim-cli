@@ -256,9 +256,8 @@ struct Roles(Vec<ElevateEntry>);
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or(
-                tracing_subscriber::EnvFilter::new(format!("{}=info", env!("CARGO_CRATE_NAME"))),
-            ),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or(tracing_subscriber::EnvFilter::new("info")),
         )
         .try_init()
         .ok();
@@ -303,10 +302,13 @@ fn activate(role: &Role, scope: &Scope, justification: &str, duration: u32) -> R
     let roles = list_roles(&token).context("unable to list available roles in PIM")?;
     let entry = roles.find(role, scope).context("role not found")?;
 
-    info!("activating {role:?} in {}", entry.scope_name);
+    info!("activating {} in {}", entry.role, entry.scope_name);
+    if let Some(request_id) = activate_role(&principal_id, &token, entry, justification, duration)
+        .context("unable to elevate to specified role")?
+    {
+        info!("submitted request: {request_id}");
+    }
 
-    activate_role(&principal_id, &token, entry, justification, duration)
-        .context("unable to elevate to specified role")?;
     Ok(())
 }
 
@@ -344,12 +346,18 @@ fn activate_set(
     let mut success = true;
     for entry in to_add {
         info!("activating {} in {}", entry.role, entry.scope_name);
-        if let Err(error) = activate_role(&principal_id, &token, entry, justification, duration) {
-            error!(
-                "scope: {} definition: {} error: {error:?}",
-                entry.scope, entry.role_definition_id
-            );
-            success = false;
+        match activate_role(&principal_id, &token, entry, justification, duration) {
+            Ok(Some(request_id)) => {
+                info!("submitted request: {request_id}");
+            }
+            Ok(None) => {}
+            Err(error) => {
+                error!(
+                    "scope: {} definition: {} error: {error:?}",
+                    entry.scope, entry.role_definition_id
+                );
+                success = false;
+            }
         }
     }
 
