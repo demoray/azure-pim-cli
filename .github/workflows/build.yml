@@ -64,7 +64,8 @@ jobs:
       - name: Get the release version from the tag
         run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
       - name: show version
-        run: echo "version is: $VERSION"
+        run: |
+          echo "version is: $VERSION"
       - name: Check that tag version and Cargo.toml version are the same
         if: false
         shell: bash
