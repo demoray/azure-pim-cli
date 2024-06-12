@@ -60,8 +60,34 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          fail_on_unmatched_files: true
-          files: artifacts/*
+      - run: find artifacts
+      - name: Get the release version from the tag
+        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+      - name: show version
+        run: |
+          echo "version is: $VERSION"
+      - name: Check that tag version and Cargo.toml version are the same
+        shell: bash
+        run: |
+          if ! grep -q "version = \"$VERSION\"" Cargo.toml; then
+            echo "version does not match Cargo.toml" >&2
+            exit 1
+          fi
+      - name: rename artifacts
+        run: |
+          set -ex
+          mv artifacts/macos/az-pim artifacts/macos/az-pim-macos
+          mv artifacts/windows/az-pim.exe artifacts/windows/az-pim-windows.exe
+          for ubuntu_rev in 22.04 24.04; do
+            for file in artifacts/ubuntu-${ubuntu_rev}/*.deb; do
+              mv "$file" "${file%.deb}_${ubuntu_rev}.deb"
+            done
+          done
+          find artifacts
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -ex
+          gh release create $VERSION --draft --verify-tag --title $VERSION
+          gh release upload $version $(find artifacts -type f)
