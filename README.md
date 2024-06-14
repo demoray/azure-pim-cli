@@ -118,6 +118,13 @@ Options:
 
           Specify multiple times to include multiple key/value pairs
 
+      --concurrency <CONCURRENCY>
+          Concurrency rate
+
+          Specify how many roles to elevate concurrently.  This can be used to speed up activation of roles.
+
+          [default: 4]
+
   -h, --help
           Print help (see a summary with '-h')
 
@@ -162,8 +169,15 @@ Options:
       --justification <JUSTIFICATION>
           Justification for the request
 
+      --concurrency <CONCURRENCY>
+          Concurrency rate
+
+          Specify how many roles to elevate concurrently.  This can be used to speed up activation of roles.
+
+          [default: 4]
+
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
 ```
 ## az-pim init <SHELL>
