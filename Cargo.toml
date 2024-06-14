@@ -8,7 +8,7 @@ keywords = ["azure"]
 license = "MIT"
 name = "azure-pim-cli"
 repository = "https://github.com/demoray/azure-pim-cli"
-version = "0.0.4"
+version = "0.0.5"
 
 [dependencies]
 anyhow = "1.0"
