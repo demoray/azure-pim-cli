@@ -176,6 +176,11 @@ Options:
 
           [default: 4]
 
+      --duration <DURATION>
+          Duration in minutes
+
+          [default: 480]
+
   -h, --help
           Print help (see a summary with '-h')
 

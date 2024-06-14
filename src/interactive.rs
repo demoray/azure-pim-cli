@@ -3,7 +3,7 @@ use anyhow::Result;
 use crossterm::{
     event::{
         self, Event,
-        KeyCode::{Backspace, Char, Down, Enter, Esc, Tab, Up},
+        KeyCode::{BackTab, Backspace, Char, Down, Enter, Esc, Tab, Up},
         KeyEventKind,
     },
     execute,
@@ -21,15 +21,17 @@ use std::io::stdout;
 const ENABLED: &str = " ✓ ";
 const DISABLED: &str = " ☐ ";
 const TITLE_TEXT: &str = "Activate Azure PIM roles";
-const JUSTIFICATION_TEXT: &str =
-    "Tab to select scopes | Type to enter justification | Enter to activate | Esc to quit";
-const SCOPE_TEXT: &str = "Tab to edit justification | ↑ or ↓ to move | Space to toggle | Enter to activate | Esc to quit";
+const JUSTIFICATION_TEXT: &str = "Type to enter justification";
+const SCOPE_TEXT: &str = "↑ or ↓ to move | Space to toggle";
+const DURATION_TEXT: &str = "↑ or ↓ to update duration";
+const ALL_HELP: &str = "Tab or Shift-Tab to change sections | Enter to activate | Esc to quit";
 const ITEM_HEIGHT: u16 = 2;
 
 pub enum Action {
     Activate {
         scopes: Vec<ScopeEntry>,
         justification: String,
+        duration: u32,
     },
     Quit,
 }
@@ -41,11 +43,13 @@ struct Entry {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum InputState {
+    Duration,
     Justification,
     Scopes,
 }
 
 struct App {
+    duration: u32,
     input_state: InputState,
     table_state: TableState,
     justification: String,
@@ -55,8 +59,9 @@ struct App {
 }
 
 impl App {
-    fn new(items: Vec<ScopeEntry>, justification: Option<String>) -> Result<Self> {
+    fn new(items: Vec<ScopeEntry>, justification: Option<String>, duration: u32) -> Result<Self> {
         Ok(Self {
+            duration,
             input_state: if justification.is_none() {
                 InputState::Justification
             } else {
@@ -117,16 +122,23 @@ impl App {
     #[allow(clippy::indexing_slicing)]
     fn draw(&mut self, f: &mut Frame) {
         let rects = Layout::vertical([
+            // title
             Constraint::Length(1),
+            // justification
             Constraint::Length(3),
+            // roles
             Constraint::Min(5),
+            // duration
             Constraint::Length(3),
+            // footer
+            Constraint::Length(4),
         ])
         .split(f.size());
         Self::render_title(f, rects[0]);
         self.render_justification(f, rects[1]);
-        self.render_table(f, rects[2]);
-        self.render_footer(f, rects[3]);
+        self.render_scopes(f, rects[2]);
+        self.render_duration(f, rects[3]);
+        self.render_footer(f, rects[4]);
     }
 
     fn render_title(frame: &mut Frame, area: Rect) {
@@ -134,6 +146,20 @@ impl App {
             Paragraph::new(TITLE_TEXT)
                 .style(Style::default().add_modifier(Modifier::BOLD))
                 .alignment(Alignment::Center),
+            area,
+        );
+    }
+
+    fn render_duration(&mut self, frame: &mut Frame, area: Rect) {
+        // Style::default().add_modifier(Modifier::REVERSED)
+        frame.render_widget(
+            Paragraph::new(format!("{} minutes", self.duration))
+                .style(if self.input_state == InputState::Duration {
+                    Style::default().add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                })
+                .block(Block::bordered().title("Duration")),
             area,
         );
     }
@@ -150,7 +176,7 @@ impl App {
         }
     }
 
-    fn render_table(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_scopes(&mut self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(
             Table::new(
                 self.items.iter().map(|data| {
@@ -194,14 +220,19 @@ impl App {
 
     fn render_footer(&self, f: &mut Frame, area: Rect) {
         f.render_widget(
-            Paragraph::new(Line::from(match self.input_state {
-                InputState::Justification => JUSTIFICATION_TEXT,
-                InputState::Scopes => SCOPE_TEXT,
-            }))
+            Paragraph::new(Text::from(format!(
+                "{}\n{ALL_HELP}",
+                match self.input_state {
+                    InputState::Duration => DURATION_TEXT,
+                    InputState::Justification => JUSTIFICATION_TEXT,
+                    InputState::Scopes => SCOPE_TEXT,
+                }
+            )))
             .style(Style::new())
             .centered()
             .block(
                 Block::bordered()
+                    .title("Help")
                     .border_type(BorderType::Double)
                     .border_style(Style::new()),
             ),
@@ -216,14 +247,27 @@ impl App {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match (self.input_state, key.code) {
-                        (InputState::Justification, Tab) => self.input_state = InputState::Scopes,
+                        (InputState::Justification, Tab) | (InputState::Duration, BackTab) => {
+                            self.input_state = InputState::Scopes;
+                        }
+                        (InputState::Scopes, Tab) | (InputState::Justification, BackTab) => {
+                            self.input_state = InputState::Duration;
+                        }
+                        (InputState::Duration, Tab) | (InputState::Scopes, BackTab) => {
+                            self.input_state = InputState::Justification;
+                        }
                         (InputState::Justification, Char(c)) => {
                             self.justification.push(c);
                         }
                         (InputState::Justification, Backspace) => {
                             self.justification.pop();
                         }
-                        (InputState::Scopes, Tab) => self.input_state = InputState::Justification,
+                        (InputState::Duration, Down) => {
+                            self.duration = self.duration.saturating_sub(1).max(1);
+                        }
+                        (InputState::Duration, Up) => {
+                            self.duration = self.duration.saturating_add(1).min(480);
+                        }
                         (InputState::Scopes, Char(' ')) => self.toggle_current(),
                         (InputState::Scopes, Down) => self.next(),
                         (InputState::Scopes, Up) => self.previous(),
@@ -238,6 +282,7 @@ impl App {
                             return Ok(Action::Activate {
                                 scopes: items,
                                 justification: self.justification,
+                                duration: self.duration,
                             });
                         }
                         _ => {}
@@ -248,7 +293,11 @@ impl App {
     }
 }
 
-pub fn interactive_ui(items: Vec<ScopeEntry>, justification: Option<String>) -> Result<Action> {
+pub fn interactive_ui(
+    items: Vec<ScopeEntry>,
+    justification: Option<String>,
+    duration: u32,
+) -> Result<Action> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = stdout();
@@ -257,7 +306,7 @@ pub fn interactive_ui(items: Vec<ScopeEntry>, justification: Option<String>) -> 
     let mut terminal = Terminal::new(backend)?;
 
     // create app and run it
-    let app = App::new(items, justification)?;
+    let app = App::new(items, justification, duration)?;
     let res = app.run(&mut terminal);
 
     // restore terminal
