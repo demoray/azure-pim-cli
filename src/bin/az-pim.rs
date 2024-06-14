@@ -18,7 +18,7 @@ use tracing::{error, info};
 // empirical testing shows we need to keep under 5 concurrent requests to keep
 // from rate limiting.  In the future, we may move to a model where we go as
 // fast as possible and only slow down once Azure says to do so.
-const CONCURRENCY: usize = 4;
+const DEFAULT_CONCURRENCY: usize = 4;
 
 #[derive(Parser)]
 #[command(disable_help_subcommand = true, name = "az-pim")]
@@ -163,6 +163,12 @@ enum SubCommand {
         ///
         /// Specify multiple times to include multiple key/value pairs
         role: Option<Vec<(Role, Scope)>>,
+        /// Concurrency rate
+        ///
+        /// Specify how many roles to elevate concurrently.  This can be used to
+        /// speed up activation of roles.
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
+        concurrency: usize,
     },
 
     /// Activate roles interactively
@@ -170,6 +176,13 @@ enum SubCommand {
         #[clap(long)]
         /// Justification for the request
         justification: Option<String>,
+
+        /// Concurrency rate
+        ///
+        /// Specify how many roles to elevate concurrently.  This can be used to
+        /// speed up activation of roles.
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
+        concurrency: usize,
     },
 
     /// Setup shell tab completions
@@ -279,7 +292,10 @@ fn main() -> Result<()> {
     let args = Cmd::parse();
 
     match args.command {
-        SubCommand::Interactive { justification } => interactive(justification),
+        SubCommand::Interactive {
+            justification,
+            concurrency,
+        } => interactive(justification, concurrency),
         SubCommand::List => list(),
         SubCommand::Activate {
             role,
@@ -292,7 +308,8 @@ fn main() -> Result<()> {
             role,
             justification,
             duration,
-        } => activate_set(config, role, &justification, duration),
+            concurrency,
+        } => activate_set(config, role, &justification, duration, concurrency),
         SubCommand::Readme => {
             build_readme();
             Ok(())
@@ -304,7 +321,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn interactive(justification: Option<String>) -> Result<()> {
+fn interactive(justification: Option<String>, concurrency: usize) -> Result<()> {
     let token = get_token().context("unable to obtain access token")?;
     let roles = list_roles(&token).context("unable to list available roles in PIM")?;
     let action = interactive_ui(roles.0, justification)?;
@@ -314,7 +331,7 @@ fn interactive(justification: Option<String>) -> Result<()> {
             justification,
         } => {
             let scopes = Some(scopes.into_iter().map(|x| (x.role, x.scope)).collect());
-            activate_set(None, scopes, &justification, 480)?;
+            activate_set(None, scopes, &justification, 480, concurrency)?;
         }
         Action::Quit => {}
     }
@@ -350,6 +367,7 @@ fn activate_set(
     role: Option<Vec<(Role, Scope)>>,
     justification: &str,
     duration: u32,
+    concurrency: usize,
 ) -> Result<()> {
     let mut desired_roles = role.unwrap_or_default();
 
@@ -377,7 +395,7 @@ fn activate_set(
     }
 
     ThreadPoolBuilder::new()
-        .num_threads(CONCURRENCY)
+        .num_threads(concurrency)
         .build_global()?;
 
     // let mut success = true;
