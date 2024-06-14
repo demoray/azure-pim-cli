@@ -7,12 +7,18 @@ use azure_pim_cli::{
 };
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use rayon::{prelude::*, ThreadPoolBuilder};
 use serde::Deserialize;
 use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
     str::FromStr,
 };
 use tracing::{error, info};
+
+// empirical testing shows we need to keep under 5 concurrent requests to keep
+// from rate limiting.  In the future, we may move to a model where we go as
+// fast as possible and only slow down once Azure says to do so.
+const CONCURRENCY: usize = 4;
 
 #[derive(Parser)]
 #[command(disable_help_subcommand = true, name = "az-pim")]
@@ -370,25 +376,33 @@ fn activate_set(
         to_add.insert(entry);
     }
 
-    let mut success = true;
-    for entry in to_add {
-        info!("activating {} in {}", entry.role, entry.scope_name);
-        match activate_role(&principal_id, &token, entry, justification, duration) {
-            Ok(Some(request_id)) => {
-                info!("submitted request: {request_id}");
-            }
-            Ok(None) => {}
-            Err(error) => {
-                error!(
-                    "scope: {} definition: {} error: {error:?}",
-                    entry.scope, entry.role_definition_id
-                );
-                success = false;
-            }
-        }
-    }
+    ThreadPoolBuilder::new()
+        .num_threads(CONCURRENCY)
+        .build_global()?;
 
-    ensure!(success, "unable to elevate to all roles");
+    // let mut success = true;
+    let results = to_add
+        .par_iter()
+        .map(|entry| {
+            info!("activating {} in {}", entry.role, entry.scope_name);
+            match activate_role(&principal_id, &token, entry, justification, duration) {
+                Ok(Some(request_id)) => {
+                    info!("submitted request: {request_id}");
+                    true
+                }
+                Ok(None) => true,
+                Err(error) => {
+                    error!(
+                        "scope: {} definition: {} error: {error:?}",
+                        entry.scope, entry.role_definition_id
+                    );
+                    false
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    ensure!(results.iter().all(|x| *x), "unable to elevate to all roles");
 
     Ok(())
 }
