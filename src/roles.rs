@@ -38,7 +38,7 @@ impl FromStr for Role {
 }
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq)]
-pub struct ScopeEntryList(Vec<ScopeEntry>);
+pub struct ScopeEntryList(pub Vec<ScopeEntry>);
 
 impl ScopeEntryList {
     #[must_use]

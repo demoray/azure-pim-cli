@@ -1,12 +1,20 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::process::Command;
+
+#[cfg(target_os = "windows")]
+const AZ_CMD: &str = "az.cmd";
+#[cfg(not(target_os = "windows"))]
+const AZ_CMD: &str = "az";
 
 /// Execute an Azure CLI command
 ///
 /// # Errors
 /// Will return `Err` if the Azure CLI fails
 fn az_cmd(args: &[&str]) -> Result<String> {
-    let output = Command::new("az").args(args).output()?;
+    let output = Command::new(AZ_CMD)
+        .args(args)
+        .output()
+        .with_context(|| format!("unable to launch {AZ_CMD}"))?;
     let output = String::from_utf8(output.stdout)?;
     Ok(output.trim().to_string())
 }

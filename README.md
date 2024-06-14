@@ -9,6 +9,7 @@ Commands:
   list          List eligible assignments
   activate      Activate a specific role
   activate-set  Activate a set of roles
+  interactive   Activate roles interactively
   init          Setup shell tab completions
 
 Options:
@@ -150,6 +151,21 @@ $ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activ
 $
 ```
 
+## az-pim interactive
+
+```
+Activate roles interactively
+
+Usage: interactive [OPTIONS]
+
+Options:
+      --justification <JUSTIFICATION>
+          Justification for the request
+
+  -h, --help
+          Print help
+
+```
 ## az-pim init <SHELL>
 
 ```
