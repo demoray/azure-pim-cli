@@ -20,6 +20,8 @@ use tracing::{error, info};
 // fast as possible and only slow down once Azure says to do so.
 const DEFAULT_CONCURRENCY: usize = 4;
 
+const DEFAULT_DURATION: u32 = 480;
+
 #[derive(Parser)]
 #[command(disable_help_subcommand = true, name = "az-pim")]
 struct Cmd {
@@ -121,7 +123,7 @@ enum SubCommand {
         /// Justification for the request
         justification: String,
         /// Duration in minutes
-        #[clap(long, default_value_t = 480)]
+        #[clap(long, default_value_t = DEFAULT_DURATION)]
         duration: u32,
     },
 
@@ -132,7 +134,7 @@ enum SubCommand {
     ActivateSet {
         /// Justification for the request
         justification: String,
-        #[clap(long, default_value_t = 480)]
+        #[clap(long, default_value_t = DEFAULT_DURATION)]
         /// Duration in minutes
         duration: u32,
         #[clap(long)]
@@ -183,6 +185,10 @@ enum SubCommand {
         /// speed up activation of roles.
         #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
+
+        #[clap(long, default_value_t = DEFAULT_DURATION)]
+        /// Duration in minutes
+        duration: u32,
     },
 
     /// Setup shell tab completions
@@ -295,7 +301,8 @@ fn main() -> Result<()> {
         SubCommand::Interactive {
             justification,
             concurrency,
-        } => interactive(justification, concurrency),
+            duration,
+        } => interactive(justification, concurrency, duration),
         SubCommand::List => list(),
         SubCommand::Activate {
             role,
@@ -321,17 +328,18 @@ fn main() -> Result<()> {
     }
 }
 
-fn interactive(justification: Option<String>, concurrency: usize) -> Result<()> {
+fn interactive(justification: Option<String>, concurrency: usize, duration: u32) -> Result<()> {
     let token = get_token().context("unable to obtain access token")?;
     let roles = list_roles(&token).context("unable to list available roles in PIM")?;
-    let action = interactive_ui(roles.0, justification)?;
+    let action = interactive_ui(roles.0, justification, duration)?;
     match action {
         Action::Activate {
             scopes,
             justification,
+            duration,
         } => {
             let scopes = Some(scopes.into_iter().map(|x| (x.role, x.scope)).collect());
-            activate_set(None, scopes, &justification, 480, concurrency)?;
+            activate_set(None, scopes, &justification, duration, concurrency)?;
         }
         Action::Quit => {}
     }
