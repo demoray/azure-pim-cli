@@ -2,6 +2,7 @@ use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     activate::activate_role,
     az_cli::{get_token, get_userid},
+    interactive::{interactive_ui, Action},
     roles::{list_roles, Role, Scope},
 };
 use clap::{Command, CommandFactory, Parser, Subcommand};
@@ -29,7 +30,7 @@ impl Cmd {
 
     fn example(cmd: &str) -> Option<&'static str> {
         match cmd {
-            "az-pim" | "az-pim generate" => None,
+            "az-pim" | "az-pim generate" | "az-pim interactive" => None,
             "az-pim list" => Some(
                 r#"
 $ az-pim list
@@ -158,6 +159,13 @@ enum SubCommand {
         role: Option<Vec<(Role, Scope)>>,
     },
 
+    /// Activate roles interactively
+    Interactive {
+        #[clap(long)]
+        /// Justification for the request
+        justification: Option<String>,
+    },
+
     /// Setup shell tab completions
     ///
     /// This command will generate shell completions for the specified shell.
@@ -265,6 +273,7 @@ fn main() -> Result<()> {
     let args = Cmd::parse();
 
     match args.command {
+        SubCommand::Interactive { justification } => interactive(justification),
         SubCommand::List => list(),
         SubCommand::Activate {
             role,
@@ -287,6 +296,24 @@ fn main() -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn interactive(justification: Option<String>) -> Result<()> {
+    let token = get_token().context("unable to obtain access token")?;
+    let roles = list_roles(&token).context("unable to list available roles in PIM")?;
+    let action = interactive_ui(roles.0, justification)?;
+    match action {
+        Action::Activate {
+            scopes,
+            justification,
+        } => {
+            let scopes = Some(scopes.into_iter().map(|x| (x.role, x.scope)).collect());
+            activate_set(None, scopes, &justification, 480)?;
+        }
+        Action::Quit => {}
+    }
+
+    Ok(())
 }
 
 fn list() -> Result<()> {

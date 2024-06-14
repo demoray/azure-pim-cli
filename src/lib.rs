@@ -7,4 +7,5 @@
 
 pub mod activate;
 pub mod az_cli;
+pub mod interactive;
 pub mod roles;
