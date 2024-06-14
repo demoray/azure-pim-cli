@@ -3,7 +3,6 @@ use std::process::Command;
 
 #[cfg(target_os = "windows")]
 const AZ_CMD: &str = "az.cmd";
-
 #[cfg(not(target_os = "windows"))]
 const AZ_CMD: &str = "az";
 
