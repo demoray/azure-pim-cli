@@ -3,7 +3,7 @@
 Unofficial CLI to list and enable Azure Privileged Identity Management (PIM) roles
 
 ```
-Usage: az-pim <COMMAND>
+Usage: az-pim [OPTIONS] <COMMAND>
 
 Commands:
   list          List active or eligible assignments
@@ -13,6 +13,12 @@ Commands:
   init          Setup shell tab completions
 
 Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
   -h, --help
           Print help
 
@@ -27,6 +33,12 @@ Usage: list [OPTIONS]
 Options:
       --active
           List active assignments
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
 
   -h, --help
           Print help
@@ -81,6 +93,12 @@ Options:
 
           [default: 480]
 
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
   -h, --help
           Print help
 
@@ -114,10 +132,16 @@ Options:
 
           [default: 480]
 
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
       --config <CONFIG>
           Path to a JSON config file containing a set of roles to elevate
 
           Example config file: ` [ { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000000" }, { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000001" } ] `
+
+      --quiet
+          Only show errors
 
       --role <ROLE=SCOPE>
           Specify a role to elevate
@@ -175,12 +199,18 @@ Options:
       --justification <JUSTIFICATION>
           Justification for the request
 
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
       --concurrency <CONCURRENCY>
           Concurrency rate
 
           Specify how many roles to elevate concurrently.  This can be used to speed up activation of roles.
 
           [default: 4]
+
+      --quiet
+          Only show errors
 
       --duration <DURATION>
           Duration in minutes
@@ -198,13 +228,19 @@ Setup shell tab completions
 
 This command will generate shell completions for the specified shell.
 
-Usage: init <SHELL>
+Usage: init [OPTIONS] <SHELL>
 
 Arguments:
   <SHELL>
           [possible values: bash, elvish, fish, powershell, zsh]
 
 Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
   -h, --help
           Print help (see a summary with '-h')
 
