@@ -56,6 +56,7 @@ struct App {
     items: Vec<Entry>,
     longest_item_lens: (u16, u16),
     scroll_state: ScrollbarState,
+    warnings: Vec<String>,
 }
 
 impl App {
@@ -78,6 +79,7 @@ impl App {
                     enabled: false,
                 })
                 .collect(),
+            warnings: Vec::new(),
         })
     }
 
@@ -119,9 +121,20 @@ impl App {
         self.scroll_state = self.scroll_state.position(i * usize::from(ITEM_HEIGHT));
     }
 
+    fn check(&mut self) {
+        self.warnings.clear();
+        if self.justification.is_empty() {
+            self.warnings.push("Justification is required".to_string());
+        }
+        if self.items.iter().all(|x| !x.enabled) {
+            self.warnings
+                .push("At least one role must be selected".to_string());
+        }
+    }
+
     #[allow(clippy::indexing_slicing)]
     fn draw(&mut self, f: &mut Frame) {
-        let rects = Layout::vertical([
+        let mut constraints = vec![
             // title
             Constraint::Length(1),
             // justification
@@ -132,13 +145,33 @@ impl App {
             Constraint::Length(3),
             // footer
             Constraint::Length(4),
-        ])
-        .split(f.size());
+        ];
+
+        if !self.warnings.is_empty() {
+            constraints.push(Constraint::Length(
+                2 + u16::try_from(self.warnings.len()).unwrap_or(0),
+            ));
+        }
+
+        let rects = Layout::vertical(constraints).split(f.size());
         Self::render_title(f, rects[0]);
         self.render_justification(f, rects[1]);
         self.render_scopes(f, rects[2]);
         self.render_duration(f, rects[3]);
         self.render_footer(f, rects[4]);
+        if !self.warnings.is_empty() {
+            self.render_warnings(f, rects[5]);
+        }
+    }
+
+    fn render_warnings(&self, frame: &mut Frame, area: Rect) {
+        frame.render_widget(
+            Paragraph::new(self.warnings.join("\n"))
+                .style(Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED))
+                .alignment(Alignment::Center)
+                .block(Block::bordered().title("Warnings!")),
+            area,
+        );
     }
 
     fn render_title(frame: &mut Frame, area: Rect) {
@@ -241,6 +274,7 @@ impl App {
     }
 
     fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Action> {
+        self.check();
         loop {
             terminal.draw(|f| self.draw(f))?;
 
@@ -272,7 +306,7 @@ impl App {
                         (InputState::Scopes, Down) => self.next(),
                         (InputState::Scopes, Up) => self.previous(),
                         (_, Esc) => return Ok(Action::Quit),
-                        (_, Enter) => {
+                        (_, Enter) if self.warnings.is_empty() => {
                             let items = self
                                 .items
                                 .into_iter()
@@ -289,6 +323,7 @@ impl App {
                     }
                 }
             }
+            self.check();
         }
     }
 }
