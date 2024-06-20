@@ -318,21 +318,16 @@ pub fn interactive_ui(
 }
 
 fn column_widths(items: &[Assignment]) -> Result<(u16, u16)> {
-    let scope_name_len = items
-        .iter()
-        .map(|x| x.scope_name.len())
-        .max()
-        .unwrap_or_default();
-    let role_len = items
-        .iter()
-        .map(|x| x.role.0.len())
-        .max()
-        .unwrap_or_default();
-    let scope_len = items
-        .iter()
-        .map(|x| x.scope.0.len())
-        .max()
-        .unwrap_or_default();
+    let (scope_name_len, role_len, scope_len) =
+        items
+            .iter()
+            .fold((0, 0, 0), |(scope_name_len, role_len, scope_len), x| {
+                (
+                    scope_name_len.max(x.scope_name.len()),
+                    role_len.max(x.role.0.len()),
+                    scope_len.max(x.scope.0.len()),
+                )
+            });
 
     Ok((
         role_len.try_into()?,
