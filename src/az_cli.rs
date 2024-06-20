@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use std::process::Command;
 
 #[cfg(target_os = "windows")]
@@ -15,6 +15,7 @@ fn az_cmd(args: &[&str]) -> Result<String> {
         .args(args)
         .output()
         .with_context(|| format!("unable to launch {AZ_CMD}"))?;
+    ensure!(output.status.success(), "az command failed {}", String::from_utf8(output.stderr)?);
     let output = String::from_utf8(output.stdout)?;
     Ok(output.trim().to_string())
 }
