@@ -302,7 +302,7 @@ impl App {
                         (InputState::Scopes, Char(' ')) => self.toggle_current(),
                         (InputState::Scopes, Down) => self.next(),
                         (InputState::Scopes, Up) => self.previous(),
-                        (_, Esc) => return Ok(Action::Quit),
+                        (_, Esc) => return Ok(None),
                         (_, Enter) if self.warnings.is_empty() => {
                             let items = self
                                 .items
