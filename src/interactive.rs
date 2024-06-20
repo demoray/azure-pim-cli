@@ -1,4 +1,4 @@
-use crate::roles::Assignment;
+use crate::roles::{Assignment, Assignments};
 use anyhow::Result;
 use crossterm::{
     event::{
@@ -27,13 +27,10 @@ const DURATION_TEXT: &str = "↑ or ↓ to update duration";
 const ALL_HELP: &str = "Tab or Shift-Tab to change sections | Enter to activate | Esc to quit";
 const ITEM_HEIGHT: u16 = 2;
 
-pub enum Action {
-    Activate {
-        scopes: Vec<Assignment>,
-        justification: String,
-        duration: u32,
-    },
-    Quit,
+pub struct Selected {
+    pub assignments: Assignments,
+    pub justification: String,
+    pub duration: u32,
 }
 
 struct Entry {
@@ -59,7 +56,7 @@ struct App {
 }
 
 impl App {
-    fn new(items: Vec<Assignment>, justification: Option<String>, duration: u32) -> Result<Self> {
+    fn new(assignments: Assignments, justification: Option<String>, duration: u32) -> Result<Self> {
         Ok(Self {
             duration,
             input_state: if justification.is_none() {
@@ -69,9 +66,10 @@ impl App {
             },
             table_state: TableState::default().with_selected(0),
             justification: justification.unwrap_or_default(),
-            longest_item_lens: column_widths(&items)?,
-            scroll_state: ScrollbarState::new((items.len() - 1) * usize::from(ITEM_HEIGHT)),
-            items: items
+            longest_item_lens: column_widths(&assignments)?,
+            scroll_state: ScrollbarState::new((assignments.0.len() - 1) * usize::from(ITEM_HEIGHT)),
+            items: assignments
+                .0
                 .into_iter()
                 .map(|value| Entry {
                     value,
@@ -240,7 +238,7 @@ impl App {
         );
     }
 
-    fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Action> {
+    fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Option<Selected>> {
         loop {
             terminal.draw(|f| self.draw(f))?;
 
@@ -271,7 +269,7 @@ impl App {
                         (InputState::Scopes, Char(' ')) => self.toggle_current(),
                         (InputState::Scopes, Down) => self.next(),
                         (InputState::Scopes, Up) => self.previous(),
-                        (_, Esc) => return Ok(Action::Quit),
+                        (_, Esc) => return Ok(None),
                         (_, Enter) => {
                             let items = self
                                 .items
@@ -279,11 +277,11 @@ impl App {
                                 .filter(|entry| entry.enabled)
                                 .map(|entry| entry.value)
                                 .collect();
-                            return Ok(Action::Activate {
-                                scopes: items,
+                            return Ok(Some(Selected {
+                                assignments: Assignments(items),
                                 justification: self.justification,
                                 duration: self.duration,
-                            });
+                            }));
                         }
                         _ => {}
                     }
@@ -294,10 +292,10 @@ impl App {
 }
 
 pub fn interactive_ui(
-    items: Vec<Assignment>,
+    items: Assignments,
     justification: Option<String>,
     duration: u32,
-) -> Result<Action> {
+) -> Result<Option<Selected>> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = stdout();
@@ -317,9 +315,10 @@ pub fn interactive_ui(
     res
 }
 
-fn column_widths(items: &[Assignment]) -> Result<(u16, u16)> {
+fn column_widths(items: &Assignments) -> Result<(u16, u16)> {
     let (scope_name_len, role_len, scope_len) =
         items
+            .0
             .iter()
             .fold((0, 0, 0), |(scope_name_len, role_len, scope_len), x| {
                 (
