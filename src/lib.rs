@@ -1,7 +1,10 @@
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
-#![deny(clippy::manual_assert)]
+#![forbid(
+    unsafe_code,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::manual_assert
+)]
 #![deny(clippy::indexing_slicing)]
 #![allow(clippy::module_name_repetitions)]
 
