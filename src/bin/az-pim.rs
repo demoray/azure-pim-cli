@@ -1,14 +1,14 @@
 use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
-    activate::activate_role,
-    az_cli::{get_token, get_userid},
+    az_cli::get_userid,
     interactive::{interactive_ui, Action},
-    roles::{list_roles, Role, Scope},
+    roles::{Role, Scope, ScopeEntryList},
+    PimClient,
 };
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use rayon::{prelude::*, ThreadPoolBuilder};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
     str::FromStr,
@@ -38,7 +38,7 @@ impl Cmd {
 
     fn example(cmd: &str) -> Option<&'static str> {
         match cmd {
-            "az-pim" | "az-pim generate" | "az-pim interactive" => None,
+            "az-pim" | "az-pim interactive" => None,
             "az-pim list" => Some(
                 r#"
 $ az-pim list
@@ -277,6 +277,13 @@ fn build_readme() {
     print!("{readme}");
 }
 
+pub(crate) fn output<T>(value: &T) -> Result<()>
+where
+    T: ?Sized + Serialize,
+{
+    serde_json::to_writer_pretty(stdout(), value).context("unable to serialize results")
+}
+
 #[derive(Deserialize)]
 struct ElevateEntry {
     role: Role,
@@ -297,26 +304,66 @@ fn main() -> Result<()> {
 
     let args = Cmd::parse();
 
+    let client = PimClient::new()?;
+
     match args.command {
+        SubCommand::List => {
+            let roles = client.list_eligible_assignments()?;
+            output(&roles)
+        }
         SubCommand::Interactive {
             justification,
             concurrency,
             duration,
-        } => interactive(justification, concurrency, duration),
-        SubCommand::List => list(),
+        } => {
+            let roles = client.list_eligible_assignments()?;
+            if let Action::Activate {
+                scopes,
+                justification,
+                duration,
+            } = interactive_ui(roles.0, justification, duration)?
+            {
+                activate_set(
+                    &client,
+                    &ScopeEntryList(scopes),
+                    &justification,
+                    duration,
+                    concurrency,
+                )?;
+            }
+            Ok(())
+        }
         SubCommand::Activate {
             role,
             scope,
             justification,
             duration,
-        } => activate(&role, &scope, &justification, duration),
+        } => {
+            let roles = client
+                .list_eligible_assignments()
+                .context("unable to list eligible assignments")?;
+            let entry = roles.find(&role, &scope).context("role not found")?;
+            info!("activating {} in {}", entry.role, entry.scope_name);
+            let principal_id = get_userid().context("unable to obtain the current user")?;
+
+            if let Some(request_id) =
+                client.activate_assignment(&principal_id, entry, &justification, duration)?
+            {
+                info!("submitted request: {request_id}");
+            }
+            Ok(())
+        }
         SubCommand::ActivateSet {
             config,
             role,
             justification,
             duration,
             concurrency,
-        } => activate_set(config, role, &justification, duration, concurrency),
+        } => {
+            let set = build_set(&client, config, role)?;
+            activate_set(&client, &set, &justification, duration, concurrency)?;
+            Ok(())
+        }
         SubCommand::Readme => {
             build_readme();
             Ok(())
@@ -328,55 +375,11 @@ fn main() -> Result<()> {
     }
 }
 
-fn interactive(justification: Option<String>, concurrency: usize, duration: u32) -> Result<()> {
-    let token = get_token().context("unable to obtain access token")?;
-    let roles = list_roles(&token).context("unable to list available roles in PIM")?;
-    let action = interactive_ui(roles.0, justification, duration)?;
-    match action {
-        Action::Activate {
-            scopes,
-            justification,
-            duration,
-        } => {
-            let scopes = Some(scopes.into_iter().map(|x| (x.role, x.scope)).collect());
-            activate_set(None, scopes, &justification, duration, concurrency)?;
-        }
-        Action::Quit => {}
-    }
-
-    Ok(())
-}
-
-fn list() -> Result<()> {
-    let token = get_token().context("unable to obtain access token")?;
-    let roles = list_roles(&token).context("unable to list available roles in PIM")?;
-    serde_json::to_writer_pretty(stdout(), &roles)?;
-    Ok(())
-}
-
-fn activate(role: &Role, scope: &Scope, justification: &str, duration: u32) -> Result<()> {
-    let principal_id = get_userid().context("unable to obtain the current user")?;
-    let token = get_token().context("unable to obtain access token")?;
-    let roles = list_roles(&token).context("unable to list available roles in PIM")?;
-    let entry = roles.find(role, scope).context("role not found")?;
-
-    info!("activating {} in {}", entry.role, entry.scope_name);
-    if let Some(request_id) = activate_role(&principal_id, &token, entry, justification, duration)
-        .context("unable to elevate to specified role")?
-    {
-        info!("submitted request: {request_id}");
-    }
-
-    Ok(())
-}
-
-fn activate_set(
+fn build_set(
+    client: &PimClient,
     config: Option<PathBuf>,
     role: Option<Vec<(Role, Scope)>>,
-    justification: &str,
-    duration: u32,
-    concurrency: usize,
-) -> Result<()> {
+) -> Result<ScopeEntryList> {
     let mut desired_roles = role.unwrap_or_default();
 
     if let Some(path) = config {
@@ -388,30 +391,41 @@ fn activate_set(
         }
     }
 
-    ensure!(!desired_roles.is_empty(), "no roles specified");
-
-    let principal_id = get_userid().context("unable to obtain the current user")?;
-    let token = get_token().context("unable to obtain access token")?;
-    let available = list_roles(&token).context("unable to list available roles in PIM")?;
+    let available = client
+        .list_eligible_assignments()
+        .context("unable to list available assignments in PIM")?;
 
     let mut to_add = BTreeSet::new();
-    for (role, scope) in &desired_roles {
+    for (role, scope) in desired_roles {
         let entry = available
-            .find(role, scope)
+            .find(&role, &scope)
             .with_context(|| format!("role not found.  role:{role} scope:{scope}"))?;
         to_add.insert(entry);
     }
 
+    Ok(ScopeEntryList(to_add.into_iter().cloned().collect()))
+}
+
+fn activate_set(
+    client: &PimClient,
+    assignments: &ScopeEntryList,
+    justification: &str,
+    duration: u32,
+    concurrency: usize,
+) -> Result<()> {
+    ensure!(!assignments.0.is_empty(), "no roles specified");
+
+    let principal_id = get_userid().context("unable to obtain the current user")?;
     ThreadPoolBuilder::new()
         .num_threads(concurrency)
         .build_global()?;
 
-    // let mut success = true;
-    let results = to_add
+    let results = assignments
+        .0
         .par_iter()
         .map(|entry| {
             info!("activating {} in {}", entry.role, entry.scope_name);
-            match activate_role(&principal_id, &token, entry, justification, duration) {
+            match client.activate_assignment(&principal_id, entry, justification, duration) {
                 Ok(Some(request_id)) => {
                     info!("submitted request: {request_id}");
                     true

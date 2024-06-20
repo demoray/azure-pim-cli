@@ -1,5 +1,4 @@
 use anyhow::{bail, Result};
-use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -37,7 +36,7 @@ impl FromStr for Role {
     }
 }
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Default)]
 pub struct ScopeEntryList(pub Vec<ScopeEntry>);
 
 impl ScopeEntryList {
@@ -56,7 +55,7 @@ impl ScopeEntryList {
     }
 }
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
 pub struct ScopeEntry {
     pub role: Role,
     pub scope: Scope,
@@ -107,21 +106,6 @@ impl ScopeEntry {
         results.sort();
         Ok(ScopeEntryList(results))
     }
-}
-
-/// List the roles available to the current user
-///
-/// # Errors
-/// Will return `Err` if the request fails or the response is not valid JSON
-pub fn list_roles(token: &str) -> Result<ScopeEntryList> {
-    let url = "https://management.azure.com/providers/Microsoft.Authorization/roleEligibilityScheduleInstances";
-    let response = Client::new()
-        .get(url)
-        .query(&[("$filter", "asTarget()"), ("api-version", "2020-10-01")])
-        .bearer_auth(token)
-        .send()?
-        .error_for_status()?;
-    ScopeEntry::parse(&response.json()?)
 }
 
 #[cfg(test)]
