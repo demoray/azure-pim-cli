@@ -23,9 +23,11 @@ use retry::{
 use roles::{ScopeEntry, ScopeEntryList};
 use serde::Serialize;
 use serde_json::Value;
-use std::time::Duration;
-use tracing::debug;
+use std::{sync::Once, time::Duration};
+use tracing::{debug, warn};
 use uuid::Uuid;
+
+const RETRY_COUNT: usize = 10;
 
 macro_rules! try_or_stop {
     ($e:expr) => {
@@ -104,7 +106,9 @@ impl PimClient {
 
         let request = builder.build()?;
 
-        let retries = Fixed::from(Duration::from_secs(5)).map(jitter).take(5);
+        let retries = Fixed::from(Duration::from_secs(5))
+            .map(jitter)
+            .take(RETRY_COUNT);
         retry(retries, || {
             let Some(request) = request.try_clone() else {
                 return OperationResult::Err(anyhow!("unable to clone request"));
@@ -148,6 +152,36 @@ impl PimClient {
             .get(url, Some(&[("$filter", "asTarget()")]))
             .context("unable to list eligible assignments")?;
         ScopeEntry::parse(&response).context("unable to parse eligible assignments")
+    }
+
+    /// List the roles active role assignments for the current user
+    pub fn list_active_assignments(&self) -> Result<ScopeEntryList> {
+        static RETRY_WARNING: Once = Once::new();
+
+        let mut entries = ScopeEntryList(Vec::new());
+        for i in 0..=RETRY_COUNT {
+            debug!("attempt {i}/{RETRY_COUNT}");
+            if i > 0 {
+                RETRY_WARNING.call_once(|| {
+                    warn!(
+                        "Listing active assignments has known reliability issues. \
+                        This request will retry up to {RETRY_COUNT} times until results are returned. \
+                        If you continue to see no results, please try again later."
+                    );
+                });
+            }
+
+            let url = "https://management.azure.com/providers/Microsoft.Authorization/roleAssignmentScheduleInstances";
+            let response = self
+                .get(url, Some(&[("$filter", "asTarget()")]))
+                .context("unable to list active assignments")?;
+            entries = ScopeEntry::parse(&response).context("unable to parse active assignments")?;
+
+            if !entries.0.is_empty() {
+                break;
+            }
+        }
+        Ok(entries)
     }
 
     /// Activates the specified role
