@@ -37,11 +37,11 @@ impl FromStr for Role {
 }
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Default)]
-pub struct ScopeEntryList(pub Vec<ScopeEntry>);
+pub struct Assignments(pub Vec<Assignment>);
 
-impl ScopeEntryList {
+impl Assignments {
     #[must_use]
-    pub fn find(&self, role: &Role, scope: &Scope) -> Option<&ScopeEntry> {
+    pub fn find(&self, role: &Role, scope: &Scope) -> Option<&Assignment> {
         let scope = scope.0.to_lowercase();
         let role = role.0.to_lowercase();
         self.0
@@ -56,7 +56,7 @@ impl ScopeEntryList {
 }
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
-pub struct ScopeEntry {
+pub struct Assignment {
     pub role: Role,
     pub scope: Scope,
     pub scope_name: String,
@@ -64,11 +64,11 @@ pub struct ScopeEntry {
     pub role_definition_id: String,
 }
 
-impl ScopeEntry {
+impl Assignment {
     // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
     // that allows further nested nulls
     #[allow(clippy::indexing_slicing)]
-    pub(crate) fn parse(body: &Value) -> Result<ScopeEntryList> {
+    pub(crate) fn parse(body: &Value) -> Result<Assignments> {
         let Some(values) = body["value"].as_array() else {
             bail!("unable to parse response: missing value array: {body:#?}");
         };
@@ -104,13 +104,13 @@ impl ScopeEntry {
             });
         }
         results.sort();
-        Ok(ScopeEntryList(results))
+        Ok(Assignments(results))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ScopeEntry;
+    use super::Assignment;
     use anyhow::Result;
     use insta::assert_json_snapshot;
     use serde_json::json;
@@ -161,7 +161,7 @@ mod tests {
           ]
         });
 
-        let assignments = ScopeEntry::parse(&value)?;
+        let assignments = Assignment::parse(&value)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }

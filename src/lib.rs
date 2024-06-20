@@ -20,7 +20,7 @@ use retry::{
     delay::{jitter, Fixed},
     retry, OperationResult,
 };
-use roles::{ScopeEntry, ScopeEntryList};
+use roles::{Assignment, Assignments};
 use serde::Serialize;
 use serde_json::Value;
 use std::{sync::Once, time::Duration};
@@ -146,19 +146,19 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn list_eligible_assignments(&self) -> Result<ScopeEntryList> {
+    pub fn list_eligible_assignments(&self) -> Result<Assignments> {
         let url = "https://management.azure.com/providers/Microsoft.Authorization/roleEligibilityScheduleInstances";
         let response = self
             .get(url, Some(&[("$filter", "asTarget()")]))
             .context("unable to list eligible assignments")?;
-        ScopeEntry::parse(&response).context("unable to parse eligible assignments")
+        Assignment::parse(&response).context("unable to parse eligible assignments")
     }
 
     /// List the roles active role assignments for the current user
-    pub fn list_active_assignments(&self) -> Result<ScopeEntryList> {
+    pub fn list_active_assignments(&self) -> Result<Assignments> {
         static RETRY_WARNING: Once = Once::new();
 
-        let mut entries = ScopeEntryList(Vec::new());
+        let mut entries = Assignments(Vec::new());
         for i in 0..=RETRY_COUNT {
             debug!("attempt {i}/{RETRY_COUNT}");
             if i > 0 {
@@ -175,7 +175,7 @@ impl PimClient {
             let response = self
                 .get(url, Some(&[("$filter", "asTarget()")]))
                 .context("unable to list active assignments")?;
-            entries = ScopeEntry::parse(&response).context("unable to parse active assignments")?;
+            entries = Assignment::parse(&response).context("unable to parse active assignments")?;
 
             if !entries.0.is_empty() {
                 break;
@@ -191,11 +191,11 @@ impl PimClient {
     pub fn activate_assignment(
         &self,
         principal_id: &str,
-        assignment: &ScopeEntry,
+        assignment: &Assignment,
         justification: &str,
         duration: u32,
     ) -> Result<Option<Uuid>> {
-        let ScopeEntry {
+        let Assignment {
             scope,
             role_definition_id,
             ..
