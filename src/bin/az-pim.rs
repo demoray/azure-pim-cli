@@ -54,7 +54,14 @@ $ az-pim list
     "scope_name": "contoso-development-2",
   }
 ]
-$
+$ az-pim list --active
+[
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope_name": "contoso-development-2",
+  }
+]
 "#,
             ),
             "az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
@@ -107,14 +114,14 @@ $
 
 #[derive(Subcommand)]
 enum SubCommand {
-    /// List eligible assignments
-    List,
+    /// List active or eligible assignments
+    List {
+        #[clap(long)]
+        /// List active assignments
+        active: bool,
+    },
 
     /// Activate a specific role
-    ///
-    /// Example usage:
-    /// ```
-    /// ```
     Activate {
         /// Name of the role to elevate
         role: Role,
@@ -307,8 +314,12 @@ fn main() -> Result<()> {
     let client = PimClient::new()?;
 
     match args.command {
-        SubCommand::List => {
-            let roles = client.list_eligible_assignments()?;
+        SubCommand::List { active } => {
+            let roles = if active {
+                client.list_active_assignments()?
+            } else {
+                client.list_eligible_assignments()?
+            };
             output(&roles)
         }
         SubCommand::Interactive {

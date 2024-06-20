@@ -6,7 +6,7 @@ Unofficial CLI to list and enable Azure Privileged Identity Management (PIM) rol
 Usage: az-pim <COMMAND>
 
 Commands:
-  list          List eligible assignments
+  list          List active or eligible assignments
   activate      Activate a specific role
   activate-set  Activate a set of roles
   interactive   Activate roles interactively
@@ -20,11 +20,14 @@ Options:
 ## az-pim list
 
 ```
-List eligible assignments
+List active or eligible assignments
 
-Usage: list
+Usage: list [OPTIONS]
 
 Options:
+      --active
+          List active assignments
+
   -h, --help
           Print help
 
@@ -45,7 +48,14 @@ $ az-pim list
     "scope_name": "contoso-development-2",
   }
 ]
-$
+$ az-pim list --active
+[
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope_name": "contoso-development-2",
+  }
+]
 ```
 
 ## az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>
@@ -53,10 +63,6 @@ $
 ```
 Activate a specific role
 
-Example usage:
-```
-
-```
 Usage: activate [OPTIONS] <ROLE> <SCOPE> <JUSTIFICATION>
 
 Arguments:
@@ -76,7 +82,7 @@ Options:
           [default: 480]
 
   -h, --help
-          Print help (see a summary with '-h')
+          Print help
 
 ```
 ### Example Usage
