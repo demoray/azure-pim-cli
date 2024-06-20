@@ -1,19 +1,17 @@
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result};
 use azure_pim_cli::{
-    az_cli::get_userid,
     interactive::{interactive_ui, Selected},
     roles::{Assignments, Role, Scope},
     PimClient,
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
-use rayon::{prelude::*, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
     str::FromStr,
 };
-use tracing::{error, info};
+use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
 
 // empirical testing shows we need to keep under 5 concurrent requests to keep
@@ -343,7 +341,12 @@ fn main() -> Result<()> {
                 duration,
             }) = interactive_ui(roles, justification, duration)?
             {
-                activate_set(&client, &assignments, &justification, duration, concurrency)?;
+                client.activate_assignment_set(
+                    &assignments,
+                    &justification,
+                    duration,
+                    concurrency,
+                )?;
             }
             Ok(())
         }
@@ -358,11 +361,7 @@ fn main() -> Result<()> {
                 .context("unable to list eligible assignments")?;
             let entry = roles.find(&role, &scope).context("role not found")?;
             info!("activating {} in {}", entry.role, entry.scope_name);
-            let principal_id = get_userid().context("unable to obtain the current user")?;
-
-            if let Some(request_id) =
-                client.activate_assignment(&principal_id, entry, &justification, duration)?
-            {
+            if let Some(request_id) = client.activate_assignment(entry, &justification, duration)? {
                 info!("submitted request: {request_id}");
             }
             Ok(())
@@ -375,7 +374,7 @@ fn main() -> Result<()> {
             concurrency,
         } => {
             let set = build_set(&client, config, role)?;
-            activate_set(&client, &set, &justification, duration, concurrency)?;
+            client.activate_assignment_set(&set, &justification, duration, concurrency)?;
             Ok(())
         }
         SubCommand::Readme => {
@@ -418,47 +417,6 @@ fn build_set(
     }
 
     Ok(Assignments(to_add.into_iter().cloned().collect()))
-}
-
-fn activate_set(
-    client: &PimClient,
-    assignments: &Assignments,
-    justification: &str,
-    duration: u32,
-    concurrency: usize,
-) -> Result<()> {
-    ensure!(!assignments.0.is_empty(), "no roles specified");
-
-    let principal_id = get_userid().context("unable to obtain the current user")?;
-    ThreadPoolBuilder::new()
-        .num_threads(concurrency)
-        .build_global()?;
-
-    let results = assignments
-        .0
-        .par_iter()
-        .map(|entry| {
-            info!("activating {} in {}", entry.role, entry.scope_name);
-            match client.activate_assignment(&principal_id, entry, justification, duration) {
-                Ok(Some(request_id)) => {
-                    info!("submitted request: {request_id}");
-                    true
-                }
-                Ok(None) => true,
-                Err(error) => {
-                    error!(
-                        "scope: {} definition: {} error: {error:?}",
-                        entry.scope, entry.role_definition_id
-                    );
-                    false
-                }
-            }
-        })
-        .collect::<Vec<_>>();
-
-    ensure!(results.iter().all(|x| *x), "unable to elevate to all roles");
-
-    Ok(())
 }
 
 #[derive(Args)]

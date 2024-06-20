@@ -11,7 +11,9 @@ pub mod interactive;
 pub mod roles;
 
 use crate::{activate::check_error_response, az_cli::get_token};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
+use az_cli::get_userid;
+use rayon::{prelude::*, ThreadPoolBuilder};
 use reqwest::{
     blocking::{Client, Request},
     IntoUrl, Method, StatusCode,
@@ -24,7 +26,7 @@ use roles::{Assignment, Assignments};
 use serde::Serialize;
 use serde_json::Value;
 use std::{sync::Once, time::Duration};
-use tracing::{debug, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 const RETRY_COUNT: usize = 10;
@@ -40,9 +42,16 @@ macro_rules! try_or_stop {
     };
 }
 
+pub enum ActivationResult {
+    Existing,
+    Submitted(Assignment),
+    Failed(Assignment),
+}
+
 pub struct PimClient {
     client: Client,
     token: String,
+    principal_id: String,
 }
 
 impl PimClient {
@@ -50,6 +59,7 @@ impl PimClient {
         Ok(Self {
             client: Client::new(),
             token: get_token().context("unable to obtain access token")?,
+            principal_id: get_userid().context("unable to obtain the current user")?,
         })
     }
 
@@ -190,7 +200,6 @@ impl PimClient {
     /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn activate_assignment(
         &self,
-        principal_id: &str,
         assignment: &Assignment,
         justification: &str,
         duration: u32,
@@ -204,7 +213,7 @@ impl PimClient {
         let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
         let body = serde_json::json!({
             "properties": {
-                "principalId": principal_id,
+                "principalId": self.principal_id,
                 "roleDefinitionId": role_definition_id,
                 "requestType": "SelfActivate",
                 "justification": justification,
@@ -219,5 +228,64 @@ impl PimClient {
 
         self.put(url, body, None::<Value>, Some(check_error_response))?;
         Ok(Some(request_id))
+    }
+
+    pub fn activate_assignment_set(
+        &self,
+        assignments: &Assignments,
+        justification: &str,
+        duration: u32,
+        concurrency: usize,
+    ) -> Result<Assignments> {
+        ensure!(!assignments.0.is_empty(), "no roles specified");
+
+        ThreadPoolBuilder::new()
+            .num_threads(concurrency)
+            .build_global()?;
+
+        let results = assignments
+            .0
+            .clone()
+            .into_par_iter()
+            .map(|entry| {
+                info!("activating {} in {}", entry.role, entry.scope_name);
+                match self.activate_assignment(&entry, justification, duration) {
+                    Ok(Some(request_id)) => {
+                        info!("submitted request: {request_id}");
+                        ActivationResult::Submitted(entry)
+                    }
+                    Ok(None) => ActivationResult::Existing,
+                    Err(error) => {
+                        error!(
+                            "scope: {} definition: {} error: {error:?}",
+                            entry.scope, entry.role_definition_id
+                        );
+                        ActivationResult::Failed(entry)
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut failed = vec![];
+        let mut submitted = vec![];
+
+        for result in results {
+            match result {
+                ActivationResult::Failed(entry) => {
+                    failed.push(format!("* {} in {}", entry.role, entry.scope_name));
+                }
+                ActivationResult::Submitted(entry) => submitted.push(entry),
+                ActivationResult::Existing => {}
+            }
+        }
+
+        if !failed.is_empty() {
+            bail!(
+                "failed to activate the following roles:\n{}",
+                failed.join("\n")
+            );
+        }
+
+        Ok(Assignments(submitted))
     }
 }

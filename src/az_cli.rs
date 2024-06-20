@@ -23,7 +23,7 @@ fn az_cmd(args: &[&str]) -> Result<String> {
 ///
 /// # Errors
 /// Will return `Err` if the Azure CLI fails
-pub fn get_token() -> Result<String> {
+pub(crate) fn get_token() -> Result<String> {
     az_cmd(&[
         "account",
         "get-access-token",
@@ -39,7 +39,7 @@ pub fn get_token() -> Result<String> {
 ///
 /// # Errors
 /// Will return `Err` if the Azure CLI fails
-pub fn get_userid() -> Result<String> {
+pub(crate) fn get_userid() -> Result<String> {
     az_cmd(&[
         "ad",
         "signed-in-user",
