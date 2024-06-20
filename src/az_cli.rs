@@ -45,13 +45,5 @@ pub(crate) fn get_token() -> Result<String> {
 /// # Errors
 /// Will return `Err` if the Azure CLI fails
 pub(crate) fn get_userid() -> Result<String> {
-    az_cmd(&[
-        "ad",
-        "signed-in-user",
-        "show",
-        "--query",
-        "id",
-        "--output",
-        "tsv",
-    ])
+    az_cmd(&["account", "show", "--query", "id", "--output", "tsv"])
 }
