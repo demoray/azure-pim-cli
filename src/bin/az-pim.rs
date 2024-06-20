@@ -2,7 +2,7 @@ use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     az_cli::get_userid,
     interactive::{interactive_ui, Action},
-    roles::{Role, Scope, ScopeEntryList},
+    roles::{Assignments, Role, Scope},
     PimClient,
 };
 use clap::{Command, CommandFactory, Parser, Subcommand};
@@ -336,7 +336,7 @@ fn main() -> Result<()> {
             {
                 activate_set(
                     &client,
-                    &ScopeEntryList(scopes),
+                    &Assignments(scopes),
                     &justification,
                     duration,
                     concurrency,
@@ -390,7 +390,7 @@ fn build_set(
     client: &PimClient,
     config: Option<PathBuf>,
     role: Option<Vec<(Role, Scope)>>,
-) -> Result<ScopeEntryList> {
+) -> Result<Assignments> {
     let mut desired_roles = role.unwrap_or_default();
 
     if let Some(path) = config {
@@ -414,12 +414,12 @@ fn build_set(
         to_add.insert(entry);
     }
 
-    Ok(ScopeEntryList(to_add.into_iter().cloned().collect()))
+    Ok(Assignments(to_add.into_iter().cloned().collect()))
 }
 
 fn activate_set(
     client: &PimClient,
-    assignments: &ScopeEntryList,
+    assignments: &Assignments,
     justification: &str,
     duration: u32,
     concurrency: usize,

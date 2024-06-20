@@ -1,4 +1,4 @@
-use crate::roles::ScopeEntry;
+use crate::roles::Assignment;
 use anyhow::Result;
 use crossterm::{
     event::{
@@ -29,7 +29,7 @@ const ITEM_HEIGHT: u16 = 2;
 
 pub enum Action {
     Activate {
-        scopes: Vec<ScopeEntry>,
+        scopes: Vec<Assignment>,
         justification: String,
         duration: u32,
     },
@@ -37,7 +37,7 @@ pub enum Action {
 }
 
 struct Entry {
-    value: ScopeEntry,
+    value: Assignment,
     enabled: bool,
 }
 
@@ -59,7 +59,7 @@ struct App {
 }
 
 impl App {
-    fn new(items: Vec<ScopeEntry>, justification: Option<String>, duration: u32) -> Result<Self> {
+    fn new(items: Vec<Assignment>, justification: Option<String>, duration: u32) -> Result<Self> {
         Ok(Self {
             duration,
             input_state: if justification.is_none() {
@@ -294,7 +294,7 @@ impl App {
 }
 
 pub fn interactive_ui(
-    items: Vec<ScopeEntry>,
+    items: Vec<Assignment>,
     justification: Option<String>,
     duration: u32,
 ) -> Result<Action> {
@@ -317,7 +317,7 @@ pub fn interactive_ui(
     res
 }
 
-fn column_widths(items: &[ScopeEntry]) -> Result<(u16, u16)> {
+fn column_widths(items: &[Assignment]) -> Result<(u16, u16)> {
     let scope_name_len = items
         .iter()
         .map(|x| x.scope_name.len())
