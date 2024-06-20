@@ -1,8 +1,8 @@
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     az_cli::get_userid,
     interactive::{interactive_ui, Selected},
-    roles::{Assignment, Assignments, Role, Scope},
+    roles::{Assignments, Role, Scope},
     PimClient,
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand};
