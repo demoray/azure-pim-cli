@@ -5,7 +5,7 @@ use azure_pim_cli::{
     roles::{Assignments, Role, Scope},
     PimClient,
 };
-use clap::{Command, CommandFactory, Parser, Subcommand};
+use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use rayon::{prelude::*, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,7 @@ use std::{
     str::FromStr,
 };
 use tracing::{error, info};
+use tracing_subscriber::filter::LevelFilter;
 
 // empirical testing shows we need to keep under 5 concurrent requests to keep
 // from rate limiting.  In the future, we may move to a model where we go as
@@ -25,6 +26,9 @@ const DEFAULT_DURATION: u32 = 480;
 #[derive(Parser)]
 #[command(disable_help_subcommand = true, name = "az-pim")]
 struct Cmd {
+    #[command(flatten)]
+    verbose: Verbosity,
+
     #[clap(subcommand)]
     command: SubCommand,
 }
@@ -301,15 +305,20 @@ struct ElevateEntry {
 struct Roles(Vec<ElevateEntry>);
 
 fn main() -> Result<()> {
+    let args = Cmd::parse();
+
+    let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
+        x
+    } else {
+        tracing_subscriber::EnvFilter::builder()
+            .with_default_directive(args.verbose.get_level().into())
+            .parse("")?
+    };
+
     tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or(tracing_subscriber::EnvFilter::new("info")),
-        )
+        .with_env_filter(filter)
         .try_init()
         .ok();
-
-    let args = Cmd::parse();
 
     let client = PimClient::new()?;
 
@@ -456,4 +465,30 @@ fn activate_set(
     ensure!(results.iter().all(|x| *x), "unable to elevate to all roles");
 
     Ok(())
+}
+
+#[derive(Args)]
+#[command(about = None)]
+struct Verbosity {
+    /// Increase logging verbosity.  Provide repeatedly to increase the verbosity.
+    #[clap(long, action = ArgAction::Count, global = true)]
+    verbose: u8,
+
+    /// Only show errors
+    #[clap(long, global = true, conflicts_with = "verbose")]
+    quiet: bool,
+}
+
+impl Verbosity {
+    fn get_level(&self) -> LevelFilter {
+        if self.quiet {
+            LevelFilter::ERROR
+        } else {
+            match self.verbose {
+                0 => LevelFilter::INFO,
+                1 => LevelFilter::DEBUG,
+                _ => LevelFilter::TRACE,
+            }
+        }
+    }
 }
