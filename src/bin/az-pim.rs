@@ -1,7 +1,7 @@
 use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     az_cli::get_userid,
-    interactive::{interactive_ui, Action},
+    interactive::{interactive_ui, Selected},
     roles::{Assignments, Role, Scope},
     PimClient,
 };
@@ -337,19 +337,13 @@ fn main() -> Result<()> {
             duration,
         } => {
             let roles = client.list_eligible_assignments()?;
-            if let Action::Activate {
-                scopes,
+            if let Some(Selected {
+                assignments,
                 justification,
                 duration,
-            } = interactive_ui(roles.0, justification, duration)?
+            }) = interactive_ui(roles, justification, duration)?
             {
-                activate_set(
-                    &client,
-                    &Assignments(scopes),
-                    &justification,
-                    duration,
-                    concurrency,
-                )?;
+                activate_set(&client, &assignments, &justification, duration, concurrency)?;
             }
             Ok(())
         }
