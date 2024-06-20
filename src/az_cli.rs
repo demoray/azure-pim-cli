@@ -1,4 +1,6 @@
 use anyhow::{ensure, Context, Result};
+use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
+use serde_json::Value;
 use std::process::Command;
 
 #[cfg(target_os = "windows")]
@@ -40,10 +42,13 @@ pub(crate) fn get_token() -> Result<String> {
     ])
 }
 
-/// Get the user id for the currently logged in user from the Azure CLI
-///
-/// # Errors
-/// Will return `Err` if the Azure CLI fails
-pub(crate) fn get_userid() -> Result<String> {
-    az_cmd(&["account", "show", "--query", "id", "--output", "tsv"])
+pub(crate) fn extract_oid(token: &str) -> Result<String> {
+    let token = BASE64_STANDARD_NO_PAD.decode(token.split('.').nth(1).context("invalid token")?)?;
+    let token: Value = serde_json::from_slice(&token)?;
+    Ok(token
+        .get("oid")
+        .context("no oid in token")?
+        .as_str()
+        .context("token is not string")?
+        .to_string())
 }

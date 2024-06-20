@@ -116,6 +116,7 @@ name = "azure-pim-cli"
 version = "0.0.9"
 dependencies = [
  "anyhow",
+ "base64",
  "clap",
  "clap_complete",
  "crossterm",
