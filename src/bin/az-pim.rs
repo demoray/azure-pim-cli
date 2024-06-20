@@ -318,10 +318,9 @@ fn main() -> Result<()> {
         .try_init()
         .ok();
 
-    let client = PimClient::new()?;
-
     match args.command {
         SubCommand::List { active } => {
+            let client = PimClient::new()?;
             let roles = if active {
                 client.list_active_assignments()?
             } else {
@@ -334,6 +333,7 @@ fn main() -> Result<()> {
             concurrency,
             duration,
         } => {
+            let client = PimClient::new()?;
             let roles = client.list_eligible_assignments()?;
             if let Some(Selected {
                 assignments,
@@ -356,6 +356,7 @@ fn main() -> Result<()> {
             justification,
             duration,
         } => {
+            let client = PimClient::new()?;
             let roles = client
                 .list_eligible_assignments()
                 .context("unable to list eligible assignments")?;
@@ -373,6 +374,7 @@ fn main() -> Result<()> {
             duration,
             concurrency,
         } => {
+            let client = PimClient::new()?;
             let set = build_set(&client, config, role)?;
             client.activate_assignment_set(&set, &justification, duration, concurrency)?;
             Ok(())

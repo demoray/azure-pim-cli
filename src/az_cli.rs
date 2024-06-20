@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use std::process::Command;
 
 #[cfg(target_os = "windows")]
@@ -15,6 +15,11 @@ fn az_cmd(args: &[&str]) -> Result<String> {
         .args(args)
         .output()
         .with_context(|| format!("unable to launch {AZ_CMD}"))?;
+    ensure!(
+        output.status.success(),
+        "az command failed {}",
+        String::from_utf8(output.stderr)?
+    );
     let output = String::from_utf8(output.stdout)?;
     Ok(output.trim().to_string())
 }
@@ -40,13 +45,5 @@ pub(crate) fn get_token() -> Result<String> {
 /// # Errors
 /// Will return `Err` if the Azure CLI fails
 pub(crate) fn get_userid() -> Result<String> {
-    az_cmd(&[
-        "ad",
-        "signed-in-user",
-        "show",
-        "--query",
-        "id",
-        "--output",
-        "tsv",
-    ])
+    az_cmd(&["account", "show", "--query", "id", "--output", "tsv"])
 }
