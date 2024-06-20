@@ -13,9 +13,11 @@ pub mod az_cli;
 pub mod interactive;
 pub mod roles;
 
-use crate::{activate::check_error_response, az_cli::get_token};
+use crate::{
+    activate::check_error_response,
+    az_cli::{extract_oid, get_token},
+};
 use anyhow::{anyhow, bail, ensure, Context, Result};
-use az_cli::get_userid;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use reqwest::{
     blocking::{Client, Request},
@@ -59,10 +61,12 @@ pub struct PimClient {
 
 impl PimClient {
     pub fn new() -> Result<Self> {
+        let token = get_token().context("unable to obtain access token")?;
+        let principal_id = extract_oid(&token).context("unable to obtain the current user")?;
         Ok(Self {
             client: Client::new(),
-            token: get_token().context("unable to obtain access token")?,
-            principal_id: get_userid().context("unable to obtain the current user")?,
+            token,
+            principal_id,
         })
     }
 
