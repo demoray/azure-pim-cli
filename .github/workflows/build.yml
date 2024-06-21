@@ -16,38 +16,56 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        - build: linux-musl
+          os: ubuntu-24.04
+          target: x86_64-unknown-linux-musl
         - build: ubuntu-22.04
           os: ubuntu-22.04
+          target:
         - build: ubuntu-24.04
           os: ubuntu-24.04
+          target:
         - build: macos
           os: macos-latest
+          target:
         - build: windows
           os: windows-latest
+          target:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v2
-    - run: eng/build.sh
+    - run: sudo apt-get install -y --no-install-recommends musl-tools
+      shell: bash
+      if: matrix.build == 'linux-musl'
+    - run: eng/build.sh ${{ matrix.target }}
       shell: bash
     - uses: actions/upload-artifact@v4
-      if: matrix.os == 'windows-latest'
+      if: matrix.build == 'windows'
       with:
         name: ${{ matrix.build }}
-        path: target/release/az-pim.exe
+        path: target/x86_64-pc-windows-msvc/release/az-pim.exe
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
-      if: matrix.os == 'macos-latest'
+      if: matrix.build == 'macos'
       with:
         name: ${{ matrix.build }}
-        path: target/release/az-pim
+        path: target/aarch64-apple-darwin/release/az-pim
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
-      if: startsWith(matrix.os, 'ubuntu-')
+      if: startsWith(matrix.build, 'ubuntu-')
       with:
         name: ${{ matrix.build }}
-        path: target/debian/*.deb
+        path: target/x86_64-unknown-linux-gnu/debian/*.deb
+        if-no-files-found: error
+    - uses: actions/upload-artifact@v4
+      if: matrix.build == 'linux-musl'
+      with:
+        name: ${{ matrix.build }}
+        path: target/x86_64-unknown-linux-musl/release/az-pim
         if-no-files-found: error
   
   release:
@@ -77,8 +95,9 @@ jobs:
       - name: rename artifacts
         run: |
           set -ex
-          mv artifacts/macos/az-pim artifacts/macos/az-pim-macos
-          mv artifacts/windows/az-pim.exe artifacts/windows/az-pim-windows.exe
+          mv artifacts/macos/az-pim artifacts/macos/az-pim-macos-${VERSION}
+          mv artifacts/windows/az-pim.exe artifacts/windows/az-pim-windows-${VERSION}.exe
+          mv artifacts/linux-musl/az-pim artifacts/linux-musl/az-pim-linux-musl-${VERSION}
           for ubuntu_rev in 22.04 24.04; do
             for file in artifacts/ubuntu-${ubuntu_rev}/*.deb; do
               mv "$file" "${file%.deb}_${ubuntu_rev}.deb"
