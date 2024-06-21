@@ -38,6 +38,9 @@ jobs:
       with:
         targets: ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v2
+    - run: sudo apt-get install -y --no-install-recommends musl-tools
+      shell: bash
+      if: matrix.build == 'linux-musl'
     - run: eng/build.sh ${{ matrix.target }}
       shell: bash
     - uses: actions/upload-artifact@v4
