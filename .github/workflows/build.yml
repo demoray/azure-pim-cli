@@ -35,6 +35,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
     - uses: Swatinem/rust-cache@v2
     - run: eng/build.sh ${{ matrix.target }}
       shell: bash
