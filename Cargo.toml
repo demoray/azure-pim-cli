@@ -15,9 +15,8 @@ anyhow = "1.0"
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
-crossterm = "0.27"
 itertools = "0.13"
-ratatui = { version = "0.26", features = ["crossterm"] }
+ratatui = { version = "0.27", features = ["crossterm"] }
 rayon = "1.10"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 retry = "2.0"

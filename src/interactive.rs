@@ -1,19 +1,18 @@
 use crate::roles::{Assignment, Assignments};
 use anyhow::Result;
-use crossterm::{
-    event::{
-        self, Event,
-        KeyCode::{BackTab, Backspace, Char, Down, Enter, Esc, Tab, Up},
-        KeyEventKind,
-    },
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use ratatui::{
+    crossterm::{
+        event::{
+            self, Event,
+            KeyCode::{BackTab, Backspace, Char, Down, Enter, Esc, Tab, Up},
+            KeyEventKind,
+        },
+        execute,
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    },
     prelude::*,
     widgets::{
-        Block, BorderType, Cell, HighlightSpacing, Paragraph, Row, ScrollbarState, Table,
-        TableState,
+        Block, BorderType, HighlightSpacing, Paragraph, Row, ScrollbarState, Table, TableState,
     },
 };
 use std::io::stdout;
@@ -212,15 +211,12 @@ impl App {
             Table::new(
                 self.items.iter().map(|data| {
                     Row::new(vec![
-                        Cell::from(Text::from(format!(
+                        format!(
                             "{} {}",
                             if data.enabled { ENABLED } else { DISABLED },
                             data.value.role
-                        ))),
-                        Cell::from(Text::from(format!(
-                            "{}\n{}",
-                            data.value.scope_name, data.value.scope
-                        ))),
+                        ),
+                        format!("{}\n{}", data.value.scope_name, data.value.scope),
                     ])
                     .height(ITEM_HEIGHT)
                 }),
@@ -232,7 +228,6 @@ impl App {
             .header(
                 ["Role", "Scope"]
                     .into_iter()
-                    .map(Cell::from)
                     .collect::<Row>()
                     .style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))
                     .height(1),
@@ -251,14 +246,14 @@ impl App {
 
     fn render_footer(&self, f: &mut Frame, area: Rect) {
         f.render_widget(
-            Paragraph::new(Text::from(format!(
+            Paragraph::new(format!(
                 "{}\n{ALL_HELP}",
                 match self.input_state {
                     InputState::Duration => DURATION_TEXT,
                     InputState::Justification => JUSTIFICATION_TEXT,
                     InputState::Scopes => SCOPE_TEXT,
                 }
-            )))
+            ))
             .style(Style::new())
             .centered()
             .block(
