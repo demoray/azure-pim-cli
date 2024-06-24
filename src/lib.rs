@@ -216,7 +216,7 @@ impl PimClient {
             role_definition_id,
             ..
         } = assignment;
-        let request_id = Uuid::new_v4();
+        let request_id = Uuid::now_v7();
         let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
         let body = serde_json::json!({
             "properties": {
