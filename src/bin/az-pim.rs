@@ -249,7 +249,6 @@ enum ActivateSubCommand {
 }
 impl ActivateSubCommand {
     fn run(self) -> Result<()> {
-        println!("got {self:?}");
         match self {
             Self::Role {
                 role,
