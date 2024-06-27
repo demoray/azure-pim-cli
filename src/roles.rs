@@ -15,9 +15,7 @@ impl Display for ParseError {
     }
 }
 
-impl std::error::Error for ParseError {
-}
-
+impl std::error::Error for ParseError {}
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Deserialize)]
 pub struct Scope(pub String);
