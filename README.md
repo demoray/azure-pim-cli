@@ -131,7 +131,6 @@ Options:
 ```
 $ az-pim activate role Owner "My Subscription" "developing pim"
 2024-06-27T16:55:27.676291Z  INFO az_pim: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-2024-06-27T16:55:32.580059Z  INFO az_pim: submitted request: 01905a9f-9abc-7870-8726-9ebbe4f14655
 $
 ```
 
@@ -186,7 +185,6 @@ Options:
 ```
 $ az-pim activate set 'continued development' --role 'Owner=My Subscription'
 2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-2024-06-27T17:23:08.568263Z  INFO azure_pim_cli: submitted request: 01905ab8-e0ad-7c62-8ec7-9c5d7a2f1a13
 $ cat config.json
 [
   {
