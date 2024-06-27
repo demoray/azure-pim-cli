@@ -85,8 +85,9 @@ impl PimClient {
         }
 
         debug!("getting response json");
-        let body = try_or_stop!(response.json());
-        debug!("response json: {body:#?}");
+        let body = try_or_stop!(response.text());
+        debug!("response body: {body:#?}");
+        let body = try_or_stop!(serde_json::from_str(&body));
 
         if let Some(validate) = validate {
             try_or_stop!(validate(status, &body));
