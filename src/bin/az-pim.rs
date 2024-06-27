@@ -40,75 +40,95 @@ impl Cmd {
 
     fn example(cmd: &str) -> Option<&'static str> {
         match cmd {
-            "az-pim" | "az-pim interactive" => None,
+            "az-pim"
+            | "az-pim activate"
+            | "az-pim activate interactive"
+            | "az-pim deactivate"
+            | "az-pim deactivate interactive" => None,
             "az-pim list" => Some(
                 r#"
 $ az-pim list
 [
   {
-    "role": "Storage Blob Data Contributor",
+    "role": "Owner",
     "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-    "scope_name": "contoso-development",
+    "scope_name": "My Subscription"
   },
   {
     "role": "Storage Blob Data Contributor",
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
-    "scope_name": "contoso-development-2",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "My Subscription"
   }
 ]
 $ az-pim list --active
 [
   {
     "role": "Storage Blob Data Contributor",
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
-    "scope_name": "contoso-development-2",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "My Subscription"
   }
 ]
-"#,
-            ),
-            "az-pim activate <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
-                r#"
-$ az-pim activate "Storage Blob Data Contributor" "/subscriptions/00000000-0000-0000-0000-000000000000" "accessing storage data"
-2024-06-04T15:35:50.330623Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
-$ az-pim activate "Storage Blob Data Contributor" "contoso-development-2" "accessing storage data"
-2024-06-04T15:35:54.714131Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
 $
 "#,
             ),
-            "az-pim activate-set <JUSTIFICATION>" => Some(
+            "az-pim activate role <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
                 r#"
-$ # specifying multiple roles using a configuration file
-$ az-pim activate-set "deploying new code" --config roles.json
-2024-06-04T15:22:03.1051Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
-2024-06-04T15:22:07.25Z    INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
-$ cat roles.json
+$ az-pim activate role Owner "My Subscription" "developing pim"
+2024-06-27T16:55:27.676291Z  INFO az_pim: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+2024-06-27T16:55:32.580059Z  INFO az_pim: submitted request: 01905a9f-9abc-7870-8726-9ebbe4f14655
+$
+"#,
+            ),
+            "az-pim activate set <JUSTIFICATION>" => Some(
+                r#"
+$ az-pim activate set 'continued development' --role 'Owner=My Subscription'
+2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+2024-06-27T17:23:08.568263Z  INFO azure_pim_cli: submitted request: 01905ab8-e0ad-7c62-8ec7-9c5d7a2f1a13
+$ cat config.json
 [
   {
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-    "role": "Storage Blob Data Contributor"
+    "role": "Owner",
+    "scope_name": "My Subscription"
   },
   {
-    "scope": "contoso-development-2",
-    "role": "Storage Blob Data Contributor"
+    "role": "Storage Blob Data Contributor",
+    "scope_name": "My Subscription"
   }
 ]
-$ # specifying multiple roles via the command line
-$ az-pim activate-set "deploying new code" --role "Storage Blob Data Contributor=/subscriptions/00000000-0000-0000-0000-000000000000" --role "Storage Blob Data Contributor=contoso-development-2"
-2024-06-04T15:21:39.9341Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
-2024-06-04T15:21:43.1522Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
-$ # use `jq` to select roles to activate from the current role assignments
-$ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activate-set "deploying new code" --config /dev/stdin
-2024-06-04T18:47:15.489917Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development
-2024-06-04T18:47:20.510941Z  INFO az_pim: activating "Storage Blob Data Contributor" in contoso-development-2
+$ az-pim activate set 'continued development' --config ./config.json
+2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Storabe Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+$ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activate set "deploying new code" --config /dev/stdin
+2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Storabe Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
 $
 "#,
+            ),
+            "az-pim deactivate role <ROLE> <SCOPE>" => Some(
+                r#"
+$ az-pim deactivate role "Storage Queue Data Contributor" "My Subscription"
+2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Storage Queue Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+$
+                "#,
+            ),
+            "az-pim deactivate set" => Some(
+                r#"
+$ az-pim deactivate set --role "Owner=My Subscription"
+2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+$ # deactivate all roles by listing active roles, then deactivating all of them
+$ az-pim list | az-pim deactivate set --config /dev/stdin
+2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Storage Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+$
+                "#,
             ),
             "az-pim init <SHELL>" => Some(
                 r"
-* bash: `eval $(az-pim init bash)`
-* zsh: `source <(az-pim init zsh)`
+$ # In bash shell
+$ eval $(az-pim init bash)
+$ # In zsh shell
+$ source <(az-pim init zsh)
 ",
             ),
+
             unsupported => unimplemented!("unable to generate example for {unsupported}"),
         }
     }
@@ -123,12 +143,38 @@ enum SubCommand {
         active: bool,
     },
 
-    /// Activate a specific role
+    /// Activate roles
     Activate {
-        /// Name of the role to elevate
+        #[clap(subcommand)]
+        cmd: ActivateSubCommand,
+    },
+
+    /// Deactivate roles
+    Deactivate {
+        #[clap(subcommand)]
+        cmd: DeactivateSubCommand,
+    },
+
+    /// Setup shell tab completions
+    ///
+    /// This command will generate shell completions for the specified shell.
+    Init { shell: Shell },
+
+    #[command(hide = true)]
+    /// Generate the README.md file dynamically
+    Readme,
+}
+
+#[derive(Subcommand, Debug)]
+enum ActivateSubCommand {
+    /// Activate a specific role
+    Role {
+        /// Name of the role to activate
         role: Role,
-        /// Scope to elevate
+
+        /// Scope to activate
         scope: Scope,
+
         /// Justification for the request
         justification: String,
         /// Duration in minutes
@@ -140,14 +186,151 @@ enum SubCommand {
     ///
     /// This command can be used to activate multiple roles at once.  It can be
     /// used with a config file or by specifying roles on the command line.
-    ActivateSet {
+    Set {
         /// Justification for the request
         justification: String,
+
         #[clap(long, default_value_t = DEFAULT_DURATION)]
         /// Duration in minutes
         duration: u32,
+
         #[clap(long)]
-        /// Path to a JSON config file containing a set of roles to elevate
+        /// Path to a JSON config file containing a set of roles to activate
+        ///
+        /// Example config file:
+        /// `
+        ///     [
+        ///         {
+        ///             "role": "Owner",
+        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000000"
+        ///         },
+        ///         {
+        ///             "role": "Owner",
+        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000001"
+        ///         }
+        ///     ]
+        /// `
+        config: Option<PathBuf>,
+
+        #[clap(
+            long,
+            conflicts_with = "config",
+            value_name = "ROLE=SCOPE",
+            value_parser = parse_key_val::<Role, Scope>,
+            action = clap::ArgAction::Append
+        )]
+        /// Specify a role to activate
+        ///
+        /// Specify multiple times to include multiple key/value pairs
+        role: Option<Vec<(Role, Scope)>>,
+
+        /// Concurrency rate
+        ///
+        /// Specify how many roles to activate concurrently.  This can be used to
+        /// speed up activation of roles.
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
+        concurrency: usize,
+    },
+
+    /// Activate roles interactively
+    Interactive {
+        #[clap(long)]
+        /// Justification for the request
+        justification: Option<String>,
+
+        /// Concurrency rate
+        ///
+        /// Specify how many roles to activate concurrently.  This can be used to
+        /// speed up activation of roles.
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
+        concurrency: usize,
+
+        #[clap(long, default_value_t = DEFAULT_DURATION)]
+        /// Duration in minutes
+        duration: u32,
+    },
+}
+impl ActivateSubCommand {
+    fn run(self) -> Result<()> {
+        println!("got {self:?}");
+        match self {
+            Self::Role {
+                role,
+                scope,
+                justification,
+                duration,
+            } => {
+                let client = PimClient::new()?;
+                let roles = client
+                    .list_eligible_assignments()
+                    .context("unable to list eligible assignments")?;
+                let entry = roles
+                    .find(&role, &scope)
+                    .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
+                info!(
+                    "activating {} in {} ({})",
+                    entry.role, entry.scope_name, entry.scope
+                );
+                if let Some(request_id) =
+                    client.activate_assignment(entry, &justification, duration)?
+                {
+                    info!("submitted request: {request_id}");
+                }
+            }
+            Self::Set {
+                config,
+                role,
+                justification,
+                duration,
+                concurrency,
+            } => {
+                let client = PimClient::new()?;
+                let set = build_set(&client, config, role, false)?;
+                client.activate_assignment_set(&set, &justification, duration, concurrency)?;
+            }
+            Self::Interactive {
+                justification,
+                concurrency,
+                duration,
+            } => {
+                let client = PimClient::new()?;
+                info!("listing eligible assignments");
+                let roles = client.list_eligible_assignments()?;
+                if let Some(Selected {
+                    assignments,
+                    justification,
+                    duration,
+                }) = interactive_ui(
+                    roles,
+                    Some(justification.unwrap_or_default()),
+                    Some(duration),
+                )? {
+                    client.activate_assignment_set(
+                        &assignments,
+                        &justification,
+                        duration,
+                        concurrency,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Subcommand)]
+enum DeactivateSubCommand {
+    /// Deactivate a specific role
+    Role {
+        /// Name of the role to deactivate
+        role: Role,
+        /// Scope to deactivate
+        scope: Scope,
+    },
+    /// Deactivate a set of roles
+    Set {
+        #[clap(long)]
+        /// Path to a JSON config file containing a set of roles to deactivate
         ///
         /// Example config file:
         /// `
@@ -167,47 +350,68 @@ enum SubCommand {
             long,
             conflicts_with = "config",
             value_name = "ROLE=SCOPE",
-            value_parser = parse_key_val::<String, String>,
+            value_parser = parse_key_val::<Role, Scope>,
             action = clap::ArgAction::Append
         )]
-        /// Specify a role to elevate
+
+        /// Specify a role to deactivate
         ///
         /// Specify multiple times to include multiple key/value pairs
         role: Option<Vec<(Role, Scope)>>,
+
         /// Concurrency rate
         ///
-        /// Specify how many roles to elevate concurrently.  This can be used to
+        /// Specify how many roles to deactivate concurrently.  This can be used to
         /// speed up activation of roles.
         #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
     },
-
-    /// Activate roles interactively
+    /// Deactivate roles interactively
     Interactive {
-        #[clap(long)]
-        /// Justification for the request
-        justification: Option<String>,
-
         /// Concurrency rate
         ///
-        /// Specify how many roles to elevate concurrently.  This can be used to
-        /// speed up activation of roles.
+        /// Specify how many roles to deactivate concurrently.  This can be used to
+        /// speed up deactivation of roles.
         #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
-
-        #[clap(long, default_value_t = DEFAULT_DURATION)]
-        /// Duration in minutes
-        duration: u32,
     },
+}
 
-    /// Setup shell tab completions
-    ///
-    /// This command will generate shell completions for the specified shell.
-    Init { shell: Shell },
-
-    #[command(hide = true)]
-    /// Generate the README.md file dynamically
-    Readme,
+impl DeactivateSubCommand {
+    fn run(self) -> Result<()> {
+        match self {
+            Self::Role { role, scope } => {
+                let client = PimClient::new()?;
+                let roles = client
+                    .list_active_assignments()
+                    .context("unable to list active assignments")?;
+                let entry = roles.find(&role, &scope).context("role not found")?;
+                info!(
+                    "deactivating {} in {} ({})",
+                    entry.role, entry.scope_name, entry.scope
+                );
+                client.deactivate_assignment(entry)?;
+            }
+            Self::Set {
+                config,
+                role,
+                concurrency,
+            } => {
+                let client = PimClient::new()?;
+                let set = build_set(&client, config, role, true)?;
+                client.deactivate_assignment_set(&set, concurrency)?;
+            }
+            Self::Interactive { concurrency } => {
+                let client = PimClient::new()?;
+                info!("listing active assignments");
+                let roles = client.list_active_assignments()?;
+                if let Some(Selected { assignments, .. }) = interactive_ui(roles, None, None)? {
+                    client.deactivate_assignment_set(&assignments, concurrency)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Parse a single key-value pair of `X=Y` into a typed tuple of `(X, Y)`.
@@ -328,57 +532,8 @@ fn main() -> Result<()> {
             };
             output(&roles)
         }
-        SubCommand::Interactive {
-            justification,
-            concurrency,
-            duration,
-        } => {
-            let client = PimClient::new()?;
-            let roles = client.list_eligible_assignments()?;
-            if let Some(Selected {
-                assignments,
-                justification,
-                duration,
-            }) = interactive_ui(roles, justification, duration)?
-            {
-                client.activate_assignment_set(
-                    &assignments,
-                    &justification,
-                    duration,
-                    concurrency,
-                )?;
-            }
-            Ok(())
-        }
-        SubCommand::Activate {
-            role,
-            scope,
-            justification,
-            duration,
-        } => {
-            let client = PimClient::new()?;
-            let roles = client
-                .list_eligible_assignments()
-                .context("unable to list eligible assignments")?;
-            let entry = roles.find(&role, &scope).context("role not found")?;
-            info!("activating {} in {}", entry.role, entry.scope_name);
-            if let Some(request_id) = client.activate_assignment(entry, &justification, duration)? {
-                info!("submitted request: {request_id}");
-            }
-            Ok(())
-        }
-        SubCommand::ActivateSet {
-            config,
-            role,
-            justification,
-            duration,
-            concurrency,
-        } => {
-            let client = PimClient::new()?;
-            let set = build_set(&client, config, role)?;
-            client.activate_assignment_set(&set, &justification, duration, concurrency)?;
-            Ok(())
-        }
+        SubCommand::Activate { cmd } => cmd.run(),
+        SubCommand::Deactivate { cmd } => cmd.run(),
         SubCommand::Readme => {
             build_readme();
             Ok(())
@@ -394,6 +549,7 @@ fn build_set(
     client: &PimClient,
     config: Option<PathBuf>,
     role: Option<Vec<(Role, Scope)>>,
+    active: bool,
 ) -> Result<Assignments> {
     let mut desired_roles = role.unwrap_or_default();
 
@@ -406,13 +562,19 @@ fn build_set(
         }
     }
 
-    let available = client
-        .list_eligible_assignments()
-        .context("unable to list available assignments in PIM")?;
+    let assignments = if active {
+        client
+            .list_active_assignments()
+            .context("unable to list active assignments in PIM")?
+    } else {
+        client
+            .list_eligible_assignments()
+            .context("unable to list available assignments in PIM")?
+    };
 
     let mut to_add = BTreeSet::new();
     for (role, scope) in desired_roles {
-        let entry = available
+        let entry = assignments
             .find(&role, &scope)
             .with_context(|| format!("role not found.  role:{role} scope:{scope}"))?;
         to_add.insert(entry);
