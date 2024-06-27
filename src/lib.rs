@@ -30,8 +30,8 @@ use retry::{
 use roles::{Assignment, Assignments};
 use serde::Serialize;
 use serde_json::Value;
-use std::time::Duration;
-use tracing::{debug, error, info};
+use std::{sync::Once, time::Duration};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 const RETRY_COUNT: usize = 10;
@@ -67,6 +67,18 @@ impl PimClient {
             token,
             principal_id,
         })
+    }
+
+    fn thread_builder(concurrency: usize) {
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| {
+            if let Err(err) = ThreadPoolBuilder::new()
+                .num_threads(concurrency)
+                .build_global()
+            {
+                warn!("thread pool failed to build: {err}");
+            }
+        });
     }
 
     fn try_request(
@@ -230,9 +242,7 @@ impl PimClient {
     ) -> Result<()> {
         ensure!(!assignments.0.is_empty(), "no roles specified");
 
-        ThreadPoolBuilder::new()
-            .num_threads(concurrency)
-            .build_global()?;
+        Self::thread_builder(concurrency);
 
         let results = assignments
             .0
@@ -307,9 +317,7 @@ impl PimClient {
     ) -> Result<()> {
         ensure!(!assignments.0.is_empty(), "no roles specified");
 
-        ThreadPoolBuilder::new()
-            .num_threads(concurrency)
-            .build_global()?;
+        Self::thread_builder(concurrency);
 
         let results = assignments
             .0
