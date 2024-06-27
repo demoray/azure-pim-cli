@@ -11,7 +11,6 @@ use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
     str::FromStr,
 };
-use tracing::info;
 use tracing_subscriber::filter::LevelFilter;
 
 // empirical testing shows we need to keep under 5 concurrent requests to keep
@@ -267,15 +266,7 @@ impl ActivateSubCommand {
                 let entry = roles
                     .find(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
-                info!(
-                    "activating {} in {} ({})",
-                    entry.role, entry.scope_name, entry.scope
-                );
-                if let Some(request_id) =
-                    client.activate_assignment(entry, &justification, duration)?
-                {
-                    info!("submitted request: {request_id}");
-                }
+                client.activate_assignment(entry, &justification, duration)?;
             }
             Self::Set {
                 config,
@@ -294,7 +285,6 @@ impl ActivateSubCommand {
                 duration,
             } => {
                 let client = PimClient::new()?;
-                info!("listing eligible assignments");
                 let roles = client.list_eligible_assignments()?;
                 if let Some(Selected {
                     assignments,
@@ -386,10 +376,6 @@ impl DeactivateSubCommand {
                     .list_active_assignments()
                     .context("unable to list active assignments")?;
                 let entry = roles.find(&role, &scope).context("role not found")?;
-                info!(
-                    "deactivating {} in {} ({})",
-                    entry.role, entry.scope_name, entry.scope
-                );
                 client.deactivate_assignment(entry)?;
             }
             Self::Set {
@@ -403,7 +389,6 @@ impl DeactivateSubCommand {
             }
             Self::Interactive { concurrency } => {
                 let client = PimClient::new()?;
-                info!("listing active assignments");
                 let roles = client.list_active_assignments()?;
                 if let Some(Selected { assignments, .. }) = interactive_ui(roles, None, None)? {
                     client.deactivate_assignment_set(&assignments, concurrency)?;

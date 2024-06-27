@@ -48,8 +48,7 @@ macro_rules! try_or_stop {
 }
 
 pub enum ActivationResult {
-    Existing,
-    Submitted(Assignment),
+    Success,
     Failed(Assignment),
 }
 
@@ -166,6 +165,7 @@ impl PimClient {
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn list_eligible_assignments(&self) -> Result<Assignments> {
+        info!("listing eligible assignments");
         let url = "https://management.azure.com/providers/Microsoft.Authorization/roleEligibilityScheduleInstances";
         let response = self
             .get(url, Some(&[("$filter", "asTarget()")]))
@@ -192,12 +192,14 @@ impl PimClient {
         assignment: &Assignment,
         justification: &str,
         duration: u32,
-    ) -> Result<Option<Uuid>> {
+    ) -> Result<()> {
         let Assignment {
             scope,
             role_definition_id,
-            ..
+            role,
+            scope_name,
         } = assignment;
+        info!("activating {role} in {scope_name} ({scope})");
         let request_id = Uuid::now_v7();
         let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
         let body = serde_json::json!({
@@ -216,7 +218,7 @@ impl PimClient {
         });
 
         self.put(url, body, None::<Value>, Some(check_error_response))?;
-        Ok(Some(request_id))
+        Ok(())
     }
 
     pub fn activate_assignment_set(
@@ -225,7 +227,7 @@ impl PimClient {
         justification: &str,
         duration: u32,
         concurrency: usize,
-    ) -> Result<Assignments> {
+    ) -> Result<()> {
         ensure!(!assignments.0.is_empty(), "no roles specified");
 
         ThreadPoolBuilder::new()
@@ -236,17 +238,9 @@ impl PimClient {
             .0
             .clone()
             .into_par_iter()
-            .map(|entry| {
-                info!(
-                    "activating {} in {} ({})",
-                    entry.role, entry.scope_name, entry.scope
-                );
-                match self.activate_assignment(&entry, justification, duration) {
-                    Ok(Some(request_id)) => {
-                        info!("submitted request: {request_id}");
-                        ActivationResult::Submitted(entry)
-                    }
-                    Ok(None) => ActivationResult::Existing,
+            .map(
+                |entry| match self.activate_assignment(&entry, justification, duration) {
+                    Ok(()) => ActivationResult::Success,
                     Err(error) => {
                         error!(
                             "scope: {} definition: {} error: {error:?}",
@@ -254,20 +248,18 @@ impl PimClient {
                         );
                         ActivationResult::Failed(entry)
                     }
-                }
-            })
+                },
+            )
             .collect::<Vec<_>>();
 
         let mut failed = vec![];
-        let mut submitted = vec![];
 
         for result in results {
             match result {
                 ActivationResult::Failed(entry) => {
                     failed.push(format!("* {} in {}", entry.role, entry.scope_name));
                 }
-                ActivationResult::Submitted(entry) => submitted.push(entry),
-                ActivationResult::Existing => {}
+                ActivationResult::Success => {}
             }
         }
 
@@ -278,19 +270,21 @@ impl PimClient {
             );
         }
 
-        Ok(Assignments(submitted))
+        Ok(())
     }
 
     /// Deactivate the specified role
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn deactivate_assignment(&self, assignment: &Assignment) -> Result<Uuid> {
+    pub fn deactivate_assignment(&self, assignment: &Assignment) -> Result<()> {
         let Assignment {
             scope,
             role_definition_id,
-            ..
+            role,
+            scope_name,
         } = assignment;
+        info!("deactivating {role} in {scope_name} ({scope})");
         let request_id = Uuid::now_v7();
         let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
         let body = serde_json::json!({
@@ -303,14 +297,14 @@ impl PimClient {
         });
 
         self.put(url, body, None::<Value>, Some(check_error_response))?;
-        Ok(request_id)
+        Ok(())
     }
 
     pub fn deactivate_assignment_set(
         &self,
         assignments: &Assignments,
         concurrency: usize,
-    ) -> Result<Assignments> {
+    ) -> Result<()> {
         ensure!(!assignments.0.is_empty(), "no roles specified");
 
         ThreadPoolBuilder::new()
@@ -321,37 +315,26 @@ impl PimClient {
             .0
             .clone()
             .into_par_iter()
-            .map(|entry| {
-                info!(
-                    "deactivating {} in {} ({})",
-                    entry.role, entry.scope_name, entry.scope
-                );
-                match self.deactivate_assignment(&entry) {
-                    Ok(request_id) => {
-                        info!("submitted request: {request_id}");
-                        ActivationResult::Submitted(entry)
-                    }
-                    Err(error) => {
-                        error!(
-                            "scope: {} definition: {} error: {error:?}",
-                            entry.scope, entry.role_definition_id
-                        );
-                        ActivationResult::Failed(entry)
-                    }
+            .map(|entry| match self.deactivate_assignment(&entry) {
+                Ok(()) => ActivationResult::Success,
+                Err(error) => {
+                    error!(
+                        "scope: {} definition: {} error: {error:?}",
+                        entry.scope, entry.role_definition_id
+                    );
+                    ActivationResult::Failed(entry)
                 }
             })
             .collect::<Vec<_>>();
 
         let mut failed = vec![];
-        let mut submitted = vec![];
 
         for result in results {
             match result {
                 ActivationResult::Failed(entry) => {
                     failed.push(format!("* {} in {}", entry.role, entry.scope_name));
                 }
-                ActivationResult::Submitted(entry) => submitted.push(entry),
-                ActivationResult::Existing => {}
+                ActivationResult::Success => {}
             }
         }
 
@@ -362,6 +345,6 @@ impl PimClient {
             );
         }
 
-        Ok(Assignments(submitted))
+        Ok(())
     }
 }
