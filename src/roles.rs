@@ -75,32 +75,41 @@ impl Assignment {
 
         let mut results = Vec::new();
         for entry in values {
-            let Some(role) =
-                entry["properties"]["expandedProperties"]["roleDefinition"]["displayName"].as_str()
+            let Some(role) = entry["properties"]["expandedProperties"]["roleDefinition"]
+                ["displayName"]
+                .as_str()
+                .and_then(|x| Role::from_str(x).ok())
             else {
                 bail!("no role name: {entry:#?}");
             };
 
-            let Some(scope) = entry["properties"]["expandedProperties"]["scope"]["id"].as_str()
+            let Some(scope) = entry["properties"]["expandedProperties"]["scope"]["id"]
+                .as_str()
+                .and_then(|x| Scope::from_str(x).ok())
             else {
                 bail!("no scope id: {entry:#?}");
             };
 
-            let Some(scope_name) =
-                entry["properties"]["expandedProperties"]["scope"]["displayName"].as_str()
+            let Some(scope_name) = entry["properties"]["expandedProperties"]["scope"]
+                ["displayName"]
+                .as_str()
+                .map(ToString::to_string)
             else {
                 bail!("no scope name: {entry:#?}");
             };
 
-            let Some(role_definition_id) = entry["properties"]["roleDefinitionId"].as_str() else {
+            let Some(role_definition_id) = entry["properties"]["roleDefinitionId"]
+                .as_str()
+                .map(ToString::to_string)
+            else {
                 bail!("no role definition id: {entry:#?}");
             };
 
             results.push(Self {
-                role: Role(role.to_string()),
-                scope: Scope(scope.to_string()),
-                scope_name: scope_name.to_string(),
-                role_definition_id: role_definition_id.to_string(),
+                role,
+                scope,
+                scope_name,
+                role_definition_id,
             });
         }
         results.sort();
