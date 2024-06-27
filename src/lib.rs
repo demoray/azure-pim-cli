@@ -112,6 +112,7 @@ impl PimClient {
             .client
             .request(method, url)
             .query(&[("api-version", "2020-10-01")])
+            .header("X-Ms-Command-Name", "Microsoft_Azure_PIMCommon.")
             .bearer_auth(&self.token);
 
         if let Some(query) = query {
