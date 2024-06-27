@@ -45,10 +45,10 @@ enum InputState {
 }
 
 struct App {
-    duration: u32,
+    duration: Option<u32>,
     input_state: InputState,
     table_state: TableState,
-    justification: String,
+    justification: Option<String>,
     items: Vec<Entry>,
     longest_item_lens: (u16, u16),
     scroll_state: ScrollbarState,
@@ -56,7 +56,11 @@ struct App {
 }
 
 impl App {
-    fn new(assignments: Assignments, justification: Option<String>, duration: u32) -> Result<Self> {
+    fn new(
+        assignments: Assignments,
+        justification: Option<String>,
+        duration: Option<u32>,
+    ) -> Result<Self> {
         Ok(Self {
             duration,
             input_state: if justification.is_none() {
@@ -65,7 +69,7 @@ impl App {
                 InputState::Scopes
             },
             table_state: TableState::default().with_selected(0),
-            justification: justification.unwrap_or_default(),
+            justification,
             longest_item_lens: column_widths(&assignments)?,
             scroll_state: ScrollbarState::new((assignments.0.len() - 1) * usize::from(ITEM_HEIGHT)),
             items: assignments
@@ -120,7 +124,7 @@ impl App {
 
     fn check(&mut self) {
         self.warnings.clear();
-        if self.justification.is_empty() {
+        if self.justification.as_ref().map_or(false, String::is_empty) {
             self.warnings.push("Justification is required".to_string());
         }
         if self.items.iter().all(|x| !x.enabled) {
@@ -131,33 +135,72 @@ impl App {
 
     #[allow(clippy::indexing_slicing)]
     fn draw(&mut self, f: &mut Frame) {
-        let mut constraints = vec![
+        let mut sections = vec![
             // title
             Constraint::Length(1),
-            // justification
-            Constraint::Length(3),
-            // roles
-            Constraint::Min(5),
-            // duration
-            Constraint::Length(3),
-            // footer
-            Constraint::Length(4),
         ];
 
+        // justification
+        if self.justification.is_some() {
+            sections.push(Constraint::Length(3));
+        }
+
+        // roles
+        sections.push(Constraint::Min(5));
+
+        // duration
+        if self.duration.is_some() {
+            sections.push(Constraint::Length(3));
+        }
+
+        // footer
+        sections.push(Constraint::Length(4));
+
         if !self.warnings.is_empty() {
-            constraints.push(Constraint::Length(
+            sections.push(Constraint::Length(
                 2 + u16::try_from(self.warnings.len()).unwrap_or(0),
             ));
         }
 
-        let rects = Layout::vertical(constraints).split(f.size());
-        Self::render_title(f, rects[0]);
-        self.render_justification(f, rects[1]);
-        self.render_scopes(f, rects[2]);
-        self.render_duration(f, rects[3]);
-        self.render_footer(f, rects[4]);
+        let rects = Layout::vertical(sections).split(f.size());
+        let mut rects = rects.iter();
+
+        // from here forward, if the next() call fails, we return early as the
+        // rect is missing
+        let Some(title) = rects.next() else {
+            return;
+        };
+        Self::render_title(f, *title);
+
+        if self.justification.is_some() {
+            let Some(justification) = rects.next() else {
+                return;
+            };
+            self.render_justification(f, *justification);
+        }
+
+        let Some(scopes) = rects.next() else {
+            return;
+        };
+        self.render_scopes(f, *scopes);
+
+        if self.duration.is_some() {
+            let Some(duration) = rects.next() else {
+                return;
+            };
+            self.render_duration(f, *duration);
+        }
+
+        let Some(footer) = rects.next() else {
+            return;
+        };
+        self.render_footer(f, *footer);
+
         if !self.warnings.is_empty() {
-            self.render_warnings(f, rects[5]);
+            let Some(warnings) = rects.next() else {
+                return;
+            };
+            self.render_warnings(f, *warnings);
         }
     }
 
@@ -183,7 +226,7 @@ impl App {
     fn render_duration(&mut self, frame: &mut Frame, area: Rect) {
         // Style::default().add_modifier(Modifier::REVERSED)
         frame.render_widget(
-            Paragraph::new(format!("{} minutes", self.duration))
+            Paragraph::new(format!("{} minutes", self.duration.unwrap_or_default()))
                 .style(if self.input_state == InputState::Duration {
                     Style::default().add_modifier(Modifier::REVERSED)
                 } else {
@@ -195,14 +238,14 @@ impl App {
     }
 
     fn render_justification(&mut self, frame: &mut Frame, area: Rect) {
+        let justification = self.justification.clone().unwrap_or_default();
         frame.render_widget(
-            Paragraph::new(self.justification.as_str())
-                .block(Block::bordered().title("Justification")),
+            Paragraph::new(justification.clone()).block(Block::bordered().title("Justification")),
             area,
         );
         if self.input_state == InputState::Justification {
             #[allow(clippy::cast_possible_truncation)]
-            frame.set_cursor(area.x + self.justification.len() as u16 + 1, area.y + 1);
+            frame.set_cursor(area.x + justification.len() as u16 + 1, area.y + 1);
         }
     }
 
@@ -283,16 +326,20 @@ impl App {
                             self.input_state = InputState::Justification;
                         }
                         (InputState::Justification, Char(c)) => {
-                            self.justification.push(c);
+                            if let Some(justification) = &mut self.justification {
+                                justification.push(c);
+                            }
                         }
                         (InputState::Justification, Backspace) => {
-                            self.justification.pop();
+                            if let Some(justification) = &mut self.justification {
+                                justification.pop();
+                            }
                         }
                         (InputState::Duration, Down) => {
-                            self.duration = self.duration.saturating_sub(1).max(1);
+                            self.duration = self.duration.map(|x| x.saturating_sub(1).max(1));
                         }
                         (InputState::Duration, Up) => {
-                            self.duration = self.duration.saturating_add(1).min(480);
+                            self.duration = self.duration.map(|x| x.saturating_add(1).min(480));
                         }
                         (InputState::Scopes, Char(' ')) => self.toggle_current(),
                         (InputState::Scopes, Down) => self.next(),
@@ -307,8 +354,8 @@ impl App {
                                 .collect();
                             return Ok(Some(Selected {
                                 assignments: Assignments(items),
-                                justification: self.justification,
-                                duration: self.duration,
+                                justification: self.justification.unwrap_or_default(),
+                                duration: self.duration.unwrap_or_default(),
                             }));
                         }
                         _ => {}
@@ -323,7 +370,7 @@ impl App {
 pub fn interactive_ui(
     items: Assignments,
     justification: Option<String>,
-    duration: u32,
+    duration: Option<u32>,
 ) -> Result<Option<Selected>> {
     // setup terminal
     enable_raw_mode()?;

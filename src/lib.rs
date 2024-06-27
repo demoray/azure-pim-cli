@@ -257,7 +257,10 @@ impl PimClient {
             .clone()
             .into_par_iter()
             .map(|entry| {
-                info!("activating {} in {}", entry.role, entry.scope_name);
+                info!(
+                    "activating {} in {} ({})",
+                    entry.role, entry.scope_name, entry.scope
+                );
                 match self.activate_assignment(&entry, justification, duration) {
                     Ok(Some(request_id)) => {
                         info!("submitted request: {request_id}");
