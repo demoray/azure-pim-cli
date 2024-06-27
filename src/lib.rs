@@ -30,8 +30,8 @@ use retry::{
 use roles::{Assignment, Assignments};
 use serde::Serialize;
 use serde_json::Value;
-use std::{sync::Once, time::Duration};
-use tracing::{debug, error, info, warn};
+use std::time::Duration;
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 const RETRY_COUNT: usize = 10;
@@ -175,32 +175,12 @@ impl PimClient {
 
     /// List the roles active role assignments for the current user
     pub fn list_active_assignments(&self) -> Result<Assignments> {
-        static RETRY_WARNING: Once = Once::new();
-
-        let mut entries = Assignments(Vec::new());
-        for i in 0..=RETRY_COUNT {
-            debug!("attempt {i}/{RETRY_COUNT}");
-            if i > 0 {
-                RETRY_WARNING.call_once(|| {
-                    warn!(
-                        "Listing active assignments has known reliability issues. \
-                        This request will retry up to {RETRY_COUNT} times until results are returned. \
-                        If you continue to see no results, please try again later."
-                    );
-                });
-            }
-
-            let url = "https://management.azure.com/providers/Microsoft.Authorization/roleAssignmentScheduleInstances";
-            let response = self
-                .get(url, Some(&[("$filter", "asTarget()")]))
-                .context("unable to list active assignments")?;
-            entries = Assignment::parse(&response).context("unable to parse active assignments")?;
-
-            if !entries.0.is_empty() {
-                break;
-            }
-        }
-        Ok(entries)
+        info!("listing active assignments");
+        let url = "https://management.azure.com/providers/Microsoft.Authorization/roleAssignmentScheduleInstances";
+        let response = self
+            .get(url, Some(&[("$filter", "asTarget()")]))
+            .context("unable to list active assignments")?;
+        Assignment::parse(&response).context("unable to parse active assignments")
     }
 
     /// Activates the specified role
