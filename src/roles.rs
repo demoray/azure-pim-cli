@@ -6,6 +6,19 @@ use std::{
     str::FromStr,
 };
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseError;
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "unable to parse role or scope")
+    }
+}
+
+impl std::error::Error for ParseError {
+}
+
+
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Deserialize)]
 pub struct Scope(pub String);
 impl Display for Scope {
@@ -15,8 +28,8 @@ impl Display for Scope {
 }
 
 impl FromStr for Scope {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = ParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(Self(s.to_string()))
     }
 }
@@ -30,8 +43,8 @@ impl Display for Role {
 }
 
 impl FromStr for Role {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self> {
+    type Err = ParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(Self(s.to_string()))
     }
 }
