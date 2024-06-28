@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
+    collections::BTreeSet,
     fmt::{Display, Formatter, Result as FmtResult},
     str::FromStr,
 };
@@ -47,8 +48,8 @@ impl FromStr for Role {
     }
 }
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Default)]
-pub struct Assignments(pub Vec<Assignment>);
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Default, Clone)]
+pub struct Assignments(pub BTreeSet<Assignment>);
 
 impl Assignments {
     #[must_use]
@@ -64,27 +65,45 @@ impl Assignments {
                 })
             })
     }
-}
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
-pub struct Assignment {
-    pub role: Role,
-    pub scope: Scope,
-    pub scope_name: String,
-    #[serde(skip)]
-    pub role_definition_id: String,
-}
+    #[must_use]
+    pub fn contains(&self, entry: &Assignment) -> bool {
+        self.0.contains(entry)
+    }
 
-impl Assignment {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(crate) fn friendly(&self) -> String {
+        self.0
+            .iter()
+            .map(|x| format!("* {}", x.friendly()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub(crate) fn insert(&mut self, entry: Assignment) -> bool {
+        self.0.insert(entry)
+    }
+
+    pub(crate) fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&Assignment) -> bool,
+    {
+        self.0.retain(f);
+    }
+
     // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
     // that allows further nested nulls
     #[allow(clippy::indexing_slicing)]
-    pub(crate) fn parse(body: &Value) -> Result<Assignments> {
+    pub(crate) fn parse(body: &Value) -> Result<Self> {
         let Some(values) = body["value"].as_array() else {
             bail!("unable to parse response: missing value array: {body:#?}");
         };
 
-        let mut results = Vec::new();
+        let mut results = Self::default();
         for entry in values {
             let Some(role) = entry["properties"]["expandedProperties"]["roleDefinition"]
                 ["displayName"]
@@ -116,21 +135,39 @@ impl Assignment {
                 bail!("no role definition id: {entry:#?}");
             };
 
-            results.push(Self {
+            results.insert(Assignment {
                 role,
                 scope,
                 scope_name,
                 role_definition_id,
             });
         }
-        results.sort();
-        Ok(Assignments(results))
+
+        Ok(results)
+    }
+}
+
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
+pub struct Assignment {
+    pub role: Role,
+    pub scope: Scope,
+    pub scope_name: String,
+    #[serde(skip)]
+    pub role_definition_id: String,
+}
+
+impl Assignment {
+    pub(crate) fn friendly(&self) -> String {
+        format!(
+            "\"{}\" in \"{}\" ({})",
+            self.role, self.scope_name, self.scope
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Assignment;
+    use super::Assignments;
     use anyhow::Result;
     use insta::assert_json_snapshot;
     use serde_json::json;
@@ -181,7 +218,7 @@ mod tests {
           ]
         });
 
-        let assignments = Assignment::parse(&value)?;
+        let assignments = Assignments::parse(&value)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }
