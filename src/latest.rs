@@ -11,7 +11,8 @@ use std::{
 };
 use tracing::{debug, info, trace};
 
-const CACHE_EXPIRE: Duration = Duration::from_secs(3600);
+// Only check for new versions once a day
+const CACHE_EXPIRE: Duration = Duration::from_secs(60 * 60 * 24);
 const RELEASES_API_URL: &str = "https://api.github.com/repos/demoray/azure-pim-cli/releases/latest";
 const RELEASES_URL: &str = "https://github.com/demoray/azure-pim-cli/releases";
 
