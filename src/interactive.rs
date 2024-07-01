@@ -64,9 +64,9 @@ impl App {
         Ok(Self {
             duration,
             input_state: if justification.is_none() {
-                InputState::Justification
-            } else {
                 InputState::Scopes
+            } else {
+                InputState::Justification
             },
             table_state: TableState::default().with_selected(0),
             justification,
@@ -310,6 +310,7 @@ impl App {
     }
 
     fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Option<Selected>> {
+        self.check();
         loop {
             terminal.draw(|f| self.draw(f))?;
 
