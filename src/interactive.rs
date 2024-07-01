@@ -29,7 +29,7 @@ const ITEM_HEIGHT: u16 = 2;
 pub struct Selected {
     pub assignments: Assignments,
     pub justification: String,
-    pub duration: u32,
+    pub duration: u64,
 }
 
 struct Entry {
@@ -45,7 +45,7 @@ enum InputState {
 }
 
 struct App {
-    duration: Option<u32>,
+    duration: Option<u64>,
     input_state: InputState,
     table_state: TableState,
     justification: Option<String>,
@@ -59,7 +59,7 @@ impl App {
     fn new(
         assignments: Assignments,
         justification: Option<String>,
-        duration: Option<u32>,
+        duration: Option<u64>,
     ) -> Result<Self> {
         Ok(Self {
             duration,
@@ -371,7 +371,7 @@ impl App {
 pub fn interactive_ui(
     items: Assignments,
     justification: Option<String>,
-    duration: Option<u32>,
+    duration: Option<u64>,
 ) -> Result<Option<Selected>> {
     // setup terminal
     enable_raw_mode()?;

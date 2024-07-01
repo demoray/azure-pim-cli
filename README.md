@@ -112,9 +112,11 @@ Arguments:
 
 Options:
       --duration <DURATION>
-          Duration in minutes
+          Duration for the role to be active
 
-          [default: 480]
+          Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+
+          [default: "8 hours"]
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -123,9 +125,9 @@ Options:
           Only show errors
 
       --wait <WAIT>
-          Amount of time to wait for the roles to be activated
+          Duration to wait for the roles to be activated
 
-          Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+          Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
 
   -h, --help
           Print help (see a summary with '-h')
@@ -154,9 +156,11 @@ Arguments:
 
 Options:
       --duration <DURATION>
-          Duration in minutes
+          Duration for the role to be active
 
-          [default: 480]
+          Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+
+          [default: "8 hours"]
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -182,9 +186,9 @@ Options:
           [default: 4]
 
       --wait <WAIT>
-          Amount of time to wait for the roles to be activated
+          Duration to wait for the roles to be activated
 
-          Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+          Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
 
   -h, --help
           Print help (see a summary with '-h')
@@ -239,14 +243,16 @@ Options:
           Only show errors
 
       --duration <DURATION>
-          Duration in minutes
+          Duration for the role to be active
 
-          [default: 480]
+          Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+
+          [default: "8 hours"]
 
       --wait <WAIT>
-          Amount of time to wait for the roles to be activated
+          Duration to wait for the roles to be activated
 
-          Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+          Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
 
   -h, --help
           Print help (see a summary with '-h')

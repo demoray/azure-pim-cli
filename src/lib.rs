@@ -208,7 +208,7 @@ impl PimClient {
         &self,
         assignment: &Assignment,
         justification: &str,
-        duration: u32,
+        duration: Duration,
     ) -> Result<()> {
         let Assignment {
             scope,
@@ -227,7 +227,7 @@ impl PimClient {
                 "justification": justification,
                 "scheduleInfo": {
                     "expiration": {
-                        "duration": format!("PT{duration}M"),
+                        "duration": format_duration(duration)?,
                         "type": "AfterDuration",
                     }
                 }
@@ -242,7 +242,7 @@ impl PimClient {
         &self,
         assignments: &Assignments,
         justification: &str,
-        duration: u32,
+        duration: Duration,
         concurrency: usize,
     ) -> Result<()> {
         ensure!(!assignments.0.is_empty(), "no roles specified");
@@ -407,6 +407,50 @@ impl PimClient {
             );
         }
 
+        Ok(())
+    }
+}
+
+fn format_duration(duration: Duration) -> Result<String> {
+    let mut as_secs = duration.as_secs();
+
+    let hours = as_secs / 3600;
+    as_secs %= 3600;
+
+    let minutes = as_secs / 60;
+    let seconds = as_secs % 60;
+
+    let mut data = vec![];
+    if hours > 0 {
+        data.push(format!("{hours}H"));
+    }
+    if minutes > 0 {
+        data.push(format!("{minutes}M"));
+    }
+    if seconds > 0 {
+        data.push(format!("{seconds}S"));
+    }
+
+    ensure!(!data.is_empty(), "duration must be at least 1 second");
+    Ok(format!("PT{}", data.join("")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_duration() -> Result<()> {
+        assert!(format_duration(Duration::from_secs(0)).is_err());
+        assert_eq!(format_duration(Duration::from_secs(1))?, "PT1S");
+        assert_eq!(format_duration(Duration::from_secs(60))?, "PT1M");
+        assert_eq!(format_duration(Duration::from_secs(61))?, "PT1M1S");
+        assert_eq!(format_duration(Duration::from_secs(3600))?, "PT1H");
+        assert_eq!(format_duration(Duration::from_secs(86400))?, "PT24H");
+        assert_eq!(format_duration(Duration::from_secs(86401))?, "PT24H1S");
+        assert_eq!(format_duration(Duration::from_secs(86460))?, "PT24H1M");
+        assert_eq!(format_duration(Duration::from_secs(86520))?, "PT24H2M");
+        assert_eq!(format_duration(Duration::from_secs(90061))?, "PT25H1M1S");
         Ok(())
     }
 }

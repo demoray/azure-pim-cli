@@ -6,11 +6,11 @@ use azure_pim_cli::{
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
-use humantime::Duration;
+use humantime::Duration as HumanDuration;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
-    str::FromStr,
+    str::FromStr, time::Duration,
 };
 use tracing_subscriber::filter::LevelFilter;
 
@@ -19,7 +19,7 @@ use tracing_subscriber::filter::LevelFilter;
 // fast as possible and only slow down once Azure says to do so.
 const DEFAULT_CONCURRENCY: usize = 4;
 
-const DEFAULT_DURATION: u32 = 480;
+const DEFAULT_DURATION: &str = "8 hours";
 
 #[derive(Parser)]
 #[command(disable_help_subcommand = true, name = "az-pim")]
@@ -176,15 +176,17 @@ enum ActivateSubCommand {
         /// Justification for the request
         justification: String,
 
-        /// Duration in minutes
-        #[clap(long, default_value_t = DEFAULT_DURATION)]
-        duration: u32,
+        #[clap(long, default_value = DEFAULT_DURATION)]
+        /// Duration for the role to be active
+        ///
+        /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+        duration: HumanDuration,
 
         #[clap(long)]
-        /// Amount of time to wait for the roles to be activated
+        /// Duration to wait for the roles to be activated
         ///
-        /// Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
-        wait: Option<Duration>,
+        /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+        wait: Option<HumanDuration>,
     },
 
     /// Activate a set of roles
@@ -195,9 +197,11 @@ enum ActivateSubCommand {
         /// Justification for the request
         justification: String,
 
-        #[clap(long, default_value_t = DEFAULT_DURATION)]
-        /// Duration in minutes
-        duration: u32,
+        #[clap(long, default_value = DEFAULT_DURATION)]
+        /// Duration for the role to be active
+        ///
+        /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+        duration: HumanDuration,
 
         #[clap(long)]
         /// Path to a JSON config file containing a set of roles to activate
@@ -237,10 +241,10 @@ enum ActivateSubCommand {
         concurrency: usize,
 
         #[clap(long)]
-        /// Amount of time to wait for the roles to be activated
+        /// Duration to wait for the roles to be activated
         ///
-        /// Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
-        wait: Option<Duration>,
+        /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+        wait: Option<HumanDuration>,
     },
 
     /// Activate roles interactively
@@ -256,15 +260,17 @@ enum ActivateSubCommand {
         #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
 
-        #[clap(long, default_value_t = DEFAULT_DURATION)]
-        /// Duration in minutes
-        duration: u32,
+        #[clap(long, default_value = DEFAULT_DURATION)]
+        /// Duration for the role to be active
+        ///
+        /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+        duration: HumanDuration,
 
         #[clap(long)]
-        /// Amount of time to wait for the roles to be activated
+        /// Duration to wait for the roles to be activated
         ///
-        /// Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
-        wait: Option<Duration>,
+        /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+        wait: Option<HumanDuration>,
     },
 }
 
@@ -285,7 +291,7 @@ impl ActivateSubCommand {
                 let entry = roles
                     .find(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
-                client.activate_assignment(entry, &justification, duration)?;
+                client.activate_assignment(entry, &justification, duration.into())?;
 
                 if let Some(wait) = wait {
                     client
@@ -302,7 +308,12 @@ impl ActivateSubCommand {
             } => {
                 let client = PimClient::new()?;
                 let set = build_set(&client, config, role, false)?;
-                client.activate_assignment_set(&set, &justification, duration, concurrency)?;
+                client.activate_assignment_set(
+                    &set,
+                    &justification,
+                    duration.into(),
+                    concurrency,
+                )?;
 
                 if let Some(wait) = wait {
                     client.wait_for_activation(&set, wait.into())?;
@@ -323,8 +334,9 @@ impl ActivateSubCommand {
                 }) = interactive_ui(
                     roles,
                     Some(justification.unwrap_or_default()),
-                    Some(duration),
+                    Some(duration.as_secs() / 60),
                 )? {
+                    let duration = Duration::from_secs(duration * 60);
                     client.activate_assignment_set(
                         &assignments,
                         &justification,
