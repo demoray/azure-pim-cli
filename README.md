@@ -122,8 +122,13 @@ Options:
       --quiet
           Only show errors
 
+      --wait <WAIT>
+          Amount of time to wait for the roles to be activated
+
+          Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
 ```
 #### Example Usage
@@ -175,6 +180,11 @@ Options:
           Specify how many roles to activate concurrently.  This can be used to speed up activation of roles.
 
           [default: 4]
+
+      --wait <WAIT>
+          Amount of time to wait for the roles to be activated
+
+          Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
 
   -h, --help
           Print help (see a summary with '-h')
@@ -232,6 +242,11 @@ Options:
           Duration in minutes
 
           [default: 480]
+
+      --wait <WAIT>
+          Amount of time to wait for the roles to be activated
+
+          Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
 
   -h, --help
           Print help (see a summary with '-h')

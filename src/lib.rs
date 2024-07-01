@@ -30,11 +30,16 @@ use retry::{
 use roles::{Assignment, Assignments};
 use serde::Serialize;
 use serde_json::Value;
-use std::{sync::Once, time::Duration};
+use std::{
+    sync::Once,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 const RETRY_COUNT: usize = 10;
+const WAIT_DELAY: Duration = Duration::from_secs(5);
 
 macro_rules! try_or_stop {
     ($e:expr) => {
@@ -350,6 +355,55 @@ impl PimClient {
             bail!(
                 "failed to deactivate the following roles:\n{}",
                 failed.friendly()
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn wait_for_activation(
+        &self,
+        assignments: &Assignments,
+        wait_timeout: Duration,
+    ) -> Result<()> {
+        if assignments.is_empty() {
+            return Ok(());
+        }
+
+        let start = Instant::now();
+        let mut last = None::<Instant>;
+
+        let mut waiting = assignments.clone();
+        while !waiting.is_empty() {
+            if start.elapsed() > wait_timeout {
+                break;
+            }
+
+            // only check active assignments every `wait_timeout` seconds.
+            //
+            // While the list active assignments endpoint takes ~10-30 seconds
+            // today, it could go faster in the future and this should avoid
+            // spamming said API
+            let current = Instant::now();
+            if let Some(last) = last {
+                let to_wait = last.duration_since(current).saturating_sub(WAIT_DELAY);
+                if !to_wait.is_zero() {
+                    debug!("sleeping {to_wait:?} before checking active assignments");
+                    sleep(to_wait);
+                }
+            }
+            last = Some(current);
+
+            let active = self.list_active_assignments()?;
+            info!("active assignments: {active:#?}");
+            waiting.retain(|entry| !active.contains(entry));
+            info!("still waiting: {waiting:#?}");
+        }
+
+        if !waiting.is_empty() {
+            bail!(
+                "timed out waiting for the following roles to activate:\n{}",
+                waiting.friendly()
             );
         }
 
