@@ -88,6 +88,7 @@ impl Assignments {
         self.0.insert(entry)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn retain<F>(&mut self, f: F)
     where
         F: FnMut(&Assignment) -> bool,
