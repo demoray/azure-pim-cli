@@ -200,6 +200,44 @@ impl PimClient {
         Assignments::parse(&response).context("unable to parse active assignments")
     }
 
+    /// Request extending the specified role eligibility
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
+    pub fn extend_assignment(
+        &self,
+        assignment: &Assignment,
+        justification: &str,
+        duration: Duration,
+    ) -> Result<()> {
+        let Assignment {
+            scope,
+            role_definition_id,
+            role,
+            scope_name,
+        } = assignment;
+        info!("extending {role} in {scope_name} ({scope})");
+        let request_id = Uuid::now_v7();
+        let url = format!("https://management.azure.com{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_id}");
+        let body = serde_json::json!({
+            "properties": {
+                "principalId": self.principal_id,
+                "roleDefinitionId": role_definition_id,
+                "requestType": "SelfExtend",
+                "justification": justification,
+                "scheduleInfo": {
+                    "expiration": {
+                        "duration": format_duration(duration)?,
+                        "type": "AfterDuration",
+                    }
+                }
+            }
+        });
+
+        self.put(url, body, None::<Value>, Some(check_error_response))?;
+        Ok(())
+    }
+
     /// Activates the specified role
     ///
     /// # Errors
