@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use azure_pim_cli::{
+    check_latest_version,
     interactive::{interactive_ui, Selected},
     roles::{Assignments, Role, Scope},
     PimClient,
@@ -12,6 +13,7 @@ use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
     str::FromStr, time::Duration,
 };
+use tracing::debug;
 use tracing_subscriber::filter::LevelFilter;
 
 // empirical testing shows we need to keep under 5 concurrent requests to keep
@@ -552,6 +554,10 @@ fn main() -> Result<()> {
         .with_env_filter(filter)
         .try_init()
         .ok();
+
+    if let Err(err) = check_latest_version() {
+        debug!("unable to check latest version: {err}");
+    }
 
     match args.command {
         SubCommand::List { active } => {

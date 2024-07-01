@@ -11,8 +11,10 @@
 pub mod activate;
 pub mod az_cli;
 pub mod interactive;
+mod latest;
 pub mod roles;
 
+pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
     az_cli::{extract_oid, get_token},
