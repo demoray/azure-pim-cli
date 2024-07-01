@@ -35,7 +35,7 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
 const RETRY_COUNT: usize = 10;
@@ -102,7 +102,7 @@ impl PimClient {
 
         debug!("getting response json");
         let body = try_or_stop!(response.text());
-        debug!("response body: {body:#?}");
+        trace!("response body: {body:#?}");
         let body = try_or_stop!(serde_json::from_str(&body));
 
         if let Some(validate) = validate {
