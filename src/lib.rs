@@ -480,15 +480,21 @@ mod tests {
     #[test]
     fn test_format_duration() -> Result<()> {
         assert!(format_duration(Duration::from_secs(0)).is_err());
-        assert_eq!(format_duration(Duration::from_secs(1))?, "PT1S");
-        assert_eq!(format_duration(Duration::from_secs(60))?, "PT1M");
-        assert_eq!(format_duration(Duration::from_secs(61))?, "PT1M1S");
-        assert_eq!(format_duration(Duration::from_secs(3600))?, "PT1H");
-        assert_eq!(format_duration(Duration::from_secs(86400))?, "PT24H");
-        assert_eq!(format_duration(Duration::from_secs(86401))?, "PT24H1S");
-        assert_eq!(format_duration(Duration::from_secs(86460))?, "PT24H1M");
-        assert_eq!(format_duration(Duration::from_secs(86520))?, "PT24H2M");
-        assert_eq!(format_duration(Duration::from_secs(90061))?, "PT25H1M1S");
+
+        for (secs, parsed) in [
+            (1, "PT1S"),
+            (60, "PT1M"),
+            (61, "PT1M1S"),
+            (3600, "PT1H"),
+            (86400, "PT24H"),
+            (86401, "PT24H1S"),
+            (86460, "PT24H1M"),
+            (86520, "PT24H2M"),
+            (90061, "PT25H1M1S"),
+        ] {
+            assert_eq!(format_duration(Duration::from_secs(secs))?, parsed);
+        }
+
         Ok(())
     }
 }
