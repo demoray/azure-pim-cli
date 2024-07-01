@@ -182,7 +182,7 @@ impl PimClient {
         let response = self
             .get(url, Some(&[("$filter", "asTarget()")]))
             .context("unable to list eligible assignments")?;
-        Assignment::parse(&response).context("unable to parse eligible assignments")
+        Assignments::parse(&response).context("unable to parse eligible assignments")
     }
 
     /// List the roles active role assignments for the current user
@@ -192,7 +192,7 @@ impl PimClient {
         let response = self
             .get(url, Some(&[("$filter", "asTarget()")]))
             .context("unable to list active assignments")?;
-        Assignment::parse(&response).context("unable to parse active assignments")
+        Assignments::parse(&response).context("unable to parse active assignments")
     }
 
     /// Activates the specified role
@@ -262,12 +262,12 @@ impl PimClient {
             )
             .collect::<Vec<_>>();
 
-        let mut failed = vec![];
+        let mut failed = Assignments::default();
 
         for result in results {
             match result {
                 ActivationResult::Failed(entry) => {
-                    failed.push(format!("* {} in {}", entry.role, entry.scope_name));
+                    failed.insert(entry);
                 }
                 ActivationResult::Success => {}
             }
@@ -276,7 +276,7 @@ impl PimClient {
         if !failed.is_empty() {
             bail!(
                 "failed to activate the following roles:\n{}",
-                failed.join("\n")
+                failed.friendly()
             );
         }
 
@@ -335,12 +335,12 @@ impl PimClient {
             })
             .collect::<Vec<_>>();
 
-        let mut failed = vec![];
+        let mut failed = Assignments::default();
 
         for result in results {
             match result {
                 ActivationResult::Failed(entry) => {
-                    failed.push(format!("* {} in {}", entry.role, entry.scope_name));
+                    failed.insert(entry);
                 }
                 ActivationResult::Success => {}
             }
@@ -349,7 +349,7 @@ impl PimClient {
         if !failed.is_empty() {
             bail!(
                 "failed to deactivate the following roles:\n{}",
-                failed.join("\n")
+                failed.friendly()
             );
         }
 
