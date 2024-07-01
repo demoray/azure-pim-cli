@@ -6,6 +6,7 @@ use azure_pim_cli::{
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use humantime::Duration;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
@@ -174,9 +175,16 @@ enum ActivateSubCommand {
 
         /// Justification for the request
         justification: String,
+
         /// Duration in minutes
         #[clap(long, default_value_t = DEFAULT_DURATION)]
         duration: u32,
+
+        #[clap(long)]
+        /// Amount of time to wait for the roles to be activated
+        ///
+        /// Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+        wait: Option<Duration>,
     },
 
     /// Activate a set of roles
@@ -227,6 +235,12 @@ enum ActivateSubCommand {
         /// speed up activation of roles.
         #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
+
+        #[clap(long)]
+        /// Amount of time to wait for the roles to be activated
+        ///
+        /// Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+        wait: Option<Duration>,
     },
 
     /// Activate roles interactively
@@ -245,8 +259,15 @@ enum ActivateSubCommand {
         #[clap(long, default_value_t = DEFAULT_DURATION)]
         /// Duration in minutes
         duration: u32,
+
+        #[clap(long)]
+        /// Amount of time to wait for the roles to be activated
+        ///
+        /// Examples include '1h', '1h30m', '1h30m15s', '1m 30s'
+        wait: Option<Duration>,
     },
 }
+
 impl ActivateSubCommand {
     fn run(self) -> Result<()> {
         match self {
@@ -255,6 +276,7 @@ impl ActivateSubCommand {
                 scope,
                 justification,
                 duration,
+                wait,
             } => {
                 let client = PimClient::new()?;
                 let roles = client
@@ -264,6 +286,11 @@ impl ActivateSubCommand {
                     .find(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
                 client.activate_assignment(entry, &justification, duration)?;
+
+                if let Some(wait) = wait {
+                    client
+                        .wait_for_activation(&Assignments([entry.clone()].into()), wait.into())?;
+                }
             }
             Self::Set {
                 config,
@@ -271,15 +298,21 @@ impl ActivateSubCommand {
                 justification,
                 duration,
                 concurrency,
+                wait,
             } => {
                 let client = PimClient::new()?;
                 let set = build_set(&client, config, role, false)?;
                 client.activate_assignment_set(&set, &justification, duration, concurrency)?;
+
+                if let Some(wait) = wait {
+                    client.wait_for_activation(&set, wait.into())?;
+                }
             }
             Self::Interactive {
                 justification,
                 concurrency,
                 duration,
+                wait,
             } => {
                 let client = PimClient::new()?;
                 let roles = client.list_eligible_assignments()?;
@@ -298,6 +331,10 @@ impl ActivateSubCommand {
                         duration,
                         concurrency,
                     )?;
+
+                    if let Some(wait) = wait {
+                        client.wait_for_activation(&assignments, wait.into())?;
+                    }
                 }
             }
         }
