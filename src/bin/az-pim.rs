@@ -10,8 +10,14 @@ use clap_complete::{generate, Shell};
 use humantime::Duration as HumanDuration;
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp::min, collections::BTreeSet, error::Error, fs::File, io::stdout, path::PathBuf,
-    str::FromStr, time::Duration,
+    cmp::min,
+    collections::BTreeSet,
+    error::Error,
+    fs::File,
+    io::{stderr, stdout},
+    path::PathBuf,
+    str::FromStr,
+    time::Duration,
 };
 use tracing::debug;
 use tracing_subscriber::filter::LevelFilter;
@@ -552,6 +558,7 @@ fn main() -> Result<()> {
 
     tracing_subscriber::fmt()
         .with_env_filter(filter)
+        .with_writer(stderr)
         .try_init()
         .ok();
 
