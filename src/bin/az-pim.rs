@@ -30,7 +30,7 @@ const DEFAULT_CONCURRENCY: usize = 4;
 const DEFAULT_DURATION: &str = "8 hours";
 
 #[derive(Parser)]
-#[command(disable_help_subcommand = true, name = "az-pim")]
+#[command(version, disable_help_subcommand = true, name = "az-pim")]
 struct Cmd {
     #[command(flatten)]
     verbose: Verbosity,
