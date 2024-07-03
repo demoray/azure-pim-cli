@@ -5,7 +5,7 @@ use azure_pim_cli::{
     roles::{Assignments, Role, Scope},
     PimClient,
 };
-use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand};
+use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Shell};
 use humantime::Duration as HumanDuration;
 use serde::{Deserialize, Serialize};
@@ -211,7 +211,7 @@ enum ActivateSubCommand {
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
         duration: HumanDuration,
 
-        #[clap(long)]
+        #[clap(long, value_hint = ValueHint::FilePath)]
         /// Path to a JSON config file containing a set of roles to activate
         ///
         /// Example config file:
@@ -373,7 +373,7 @@ enum DeactivateSubCommand {
     },
     /// Deactivate a set of roles
     Set {
-        #[clap(long)]
+        #[clap(long, value_hint = ValueHint::FilePath)]
         /// Path to a JSON config file containing a set of roles to deactivate
         ///
         /// Example config file:
