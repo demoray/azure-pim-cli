@@ -21,6 +21,9 @@ Options:
   -h, --help
           Print help
 
+  -V, --version
+          Print version
+
 ```
 ## az-pim list
 
