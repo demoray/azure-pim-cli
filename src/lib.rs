@@ -9,6 +9,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 pub mod activate;
+mod assignments;
 pub mod az_cli;
 pub mod interactive;
 mod latest;
