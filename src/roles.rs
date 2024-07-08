@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn parse_active() -> Result<()> {
         const ASSIGNMENTS: &str = include_str!("../tests/data/role-assignments.json");
-        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
+        let assignments = Assignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }
