@@ -52,89 +52,28 @@ impl Cmd {
             | "az-pim activate"
             | "az-pim activate interactive"
             | "az-pim deactivate"
-            | "az-pim deactivate interactive" => None,
-            "az-pim list" => Some(
-                r#"
-$ az-pim list
-[
-  {
-    "role": "Owner",
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-    "scope_name": "My Subscription"
-  },
-  {
-    "role": "Storage Blob Data Contributor",
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-    "scope_name": "My Subscription"
-  }
-]
-$ az-pim list --active
-[
-  {
-    "role": "Storage Blob Data Contributor",
-    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
-    "scope_name": "My Subscription"
-  }
-]
-$
-"#,
-            ),
-            "az-pim activate role <ROLE> <SCOPE> <JUSTIFICATION>" => Some(
-                r#"
-$ az-pim activate role Owner "My Subscription" "developing pim"
-2024-06-27T16:55:27.676291Z  INFO az_pim: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$
-"#,
-            ),
-            "az-pim activate set <JUSTIFICATION>" => Some(
-                r#"
-$ az-pim activate set 'continued development' --role 'Owner=My Subscription'
-2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$ cat config.json
-[
-  {
-    "role": "Owner",
-    "scope_name": "My Subscription"
-  },
-  {
-    "role": "Storage Blob Data Contributor",
-    "scope_name": "My Subscription"
-  }
-]
-$ az-pim activate set 'continued development' --config ./config.json
-2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Storabe Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$ az-pim list | jq 'map(select(.role | contains("Contributor")))' | az-pim activate set "deploying new code" --config /dev/stdin
-2024-06-27T17:23:03.981067Z  INFO azure_pim_cli: activating Storabe Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$
-"#,
-            ),
-            "az-pim deactivate role <ROLE> <SCOPE>" => Some(
-                r#"
-$ az-pim deactivate role "Storage Queue Data Contributor" "My Subscription"
-2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Storage Queue Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$
-                "#,
-            ),
-            "az-pim deactivate set" => Some(
-                r#"
-$ az-pim deactivate set --role "Owner=My Subscription"
-2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$ # deactivate all roles by listing active roles, then deactivating all of them
-$ az-pim list | az-pim deactivate set --config /dev/stdin
-2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Storage Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
-$
-                "#,
-            ),
-            "az-pim init <SHELL>" => Some(
-                r"
-$ # In bash shell
-$ eval $(az-pim init bash)
-$ # In zsh shell
-$ source <(az-pim init zsh)
-",
-            ),
-
+            | "az-pim deactivate interactive"
+            | "az-pim role"
+            | "az-pim role assignment"
+            | "az-pim role definition" => None,
+            "az-pim list" => Some(include_str!("../help/az-pim-list.txt")),
+            "az-pim activate role <ROLE> <SCOPE> <JUSTIFICATION>" => {
+                Some(include_str!("../help/az-pim-activate-role.txt"))
+            }
+            "az-pim activate set <JUSTIFICATION>" => {
+                Some(include_str!("../help/az-pim-activate-set.txt"))
+            }
+            "az-pim deactivate role <ROLE> <SCOPE>" => {
+                Some(include_str!("../help/az-pim-deactivate-role.txt"))
+            }
+            "az-pim deactivate set" => Some(include_str!("../help/az-pim-deactivate-set.txt")),
+            "az-pim init <SHELL>" => Some(include_str!("../help/az-pim-init.txt")),
+            "az-pim role assignment list" => {
+                Some(include_str!("../help/az-pim-role-assignment-list.txt"))
+            }
+            "az-pim role definition list" => {
+                Some(include_str!("../help/az-pim-role-definition-list.txt"))
+            }
             unsupported => unimplemented!("unable to generate example for {unsupported}"),
         }
     }
