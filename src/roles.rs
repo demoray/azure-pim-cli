@@ -185,55 +185,11 @@ mod tests {
     use super::Assignments;
     use anyhow::Result;
     use insta::assert_json_snapshot;
-    use serde_json::json;
 
     #[test]
     fn parse_active() -> Result<()> {
-        let value = json!({
-          "value": [
-            {
-              "id": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleAssignmentScheduleInstances/00000000-0000-0000-0000-000000000003",
-              "name": "00000000-0000-0000-0000-000000000003",
-              "properties": {
-                "assignmentType": "Activated",
-                "createdOn": "2024-06-19T15:53:15.98Z",
-                "endDateTime": "2024-06-19T23:53:12.377Z",
-                "expandedProperties": {
-                  "principal": {
-                    "displayName": "USERNAME",
-                    "email": "user@contoso.com",
-                    "id": "00000000-0000-0000-0000-000000000002",
-                    "type": "User"
-                  },
-                  "roleDefinition": {
-                    "displayName": "Custom Role Name",
-                    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000004",
-                    "type": "CustomRole"
-                  },
-                  "scope": {
-                    "displayName": "azure-sub-name",
-                    "id": "/subscriptions/00000000-0000-0000-0000-000000000001",
-                    "type": "subscription"
-                  }
-                },
-                "linkedRoleEligibilityScheduleId": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleEligibilitySchedules/00000000-0000-0000-0000-000000000005",
-                "linkedRoleEligibilityScheduleInstanceId": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleEligibilityScheduleInstances/00000000-0000-0000-0000-000000000006",
-                "memberType": "Group",
-                "originRoleAssignmentId": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleAssignments/00000000-0000-0000-0000-000000000003",
-                "principalId": "00000000-0000-0000-0000-000000000002",
-                "principalType": "User",
-                "roleAssignmentScheduleId": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleAssignmentSchedules/00000000-0000-0000-0000-000000000007",
-                "roleDefinitionId": "/subscriptions/00000000-0000-0000-0000-000000000001/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000004",
-                "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
-                "startDateTime": "2024-06-19T15:53:15.98Z",
-                "status": "Provisioned"
-              },
-              "type": "Microsoft.Authorization/roleAssignmentScheduleInstances"
-            }
-          ]
-        });
-
-        let assignments = Assignments::parse(&value)?;
+        const ASSIGNMENTS: &str = include_str!("../tests/data/role-assignments.json");
+        let assignments = Assignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }
