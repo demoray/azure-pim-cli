@@ -6,6 +6,7 @@ use std::{
     fmt::{Display, Formatter, Result as FmtResult},
     str::FromStr,
 };
+use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseError;
@@ -20,6 +21,20 @@ impl std::error::Error for ParseError {}
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Deserialize)]
 pub struct Scope(pub String);
+impl Scope {
+    #[must_use]
+    pub fn from_subscription(subscription_id: &Uuid) -> Self {
+        Self(format!("/subscriptions/{subscription_id}"))
+    }
+
+    #[must_use]
+    pub fn from_resource_group(subscription_id: &Uuid, resource_group: &str) -> Self {
+        Self(format!(
+            "/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
+        ))
+    }
+}
+
 impl Display for Scope {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}", self.0)
