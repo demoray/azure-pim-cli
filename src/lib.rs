@@ -11,6 +11,7 @@
 pub mod activate;
 mod assignments;
 pub mod az_cli;
+mod definitions;
 pub mod interactive;
 mod latest;
 pub mod roles;
