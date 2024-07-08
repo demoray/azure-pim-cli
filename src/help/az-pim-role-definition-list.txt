@@ -1,0 +1,64 @@
+$ az-pim role definition list --subscription 00000000-0000-0000-0000-000000000000
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000001",
+    "name": "00000000-0000-0000-0000-000000000001",
+    "properties": {
+      "assignableScopes": [
+        "/"
+      ],
+      "createdOn": "2018-11-29T18:46:55.0492387Z",
+      "updatedOn": "2018-11-29T18:46:55.0492387Z",
+      "description": "my custom role",
+      "permissions": [
+        {
+          "actions": [
+            "Microsoft.Compute/*/read",
+            "Microsoft.Network/*/read"
+          ],
+          "notActions": [],
+          "dataActions": [],
+          "notDataActions": []
+        }
+      ],
+      "roleName": "my custom name",
+      "type": "CustomRole"
+    },
+    "type": "Microsoft.Authorization/roleDefinitions"
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000007",
+    "name": "00000000-0000-0000-0000-000000000007",
+    "properties": {
+      "assignableScopes": [
+        "/"
+      ],
+      "createdOn": "2017-12-21T00:01:24.7972312Z",
+      "updatedOn": "2021-11-11T20:13:54.9397456Z",
+      "description": "Allows for read, write and delete access to Azure Storage blob containers and data",
+      "permissions": [
+        {
+          "actions": [
+            "Microsoft.Storage/storageAccounts/blobServices/containers/delete",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/write",
+            "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action"
+          ],
+          "notActions": [],
+          "dataActions": [
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/move/action",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
+          ],
+          "notDataActions": []
+        }
+      ],
+      "roleName": "Storage Blob Data Contributor",
+      "type": "BuiltInRole"
+    },
+    "type": "Microsoft.Authorization/roleDefinitions"
+  }
+]
+$

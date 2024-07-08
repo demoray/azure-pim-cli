@@ -1,0 +1,6 @@
+$ az-pim deactivate set --role "Owner=My Subscription"
+2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+$ # deactivate all roles by listing active roles, then deactivating all of them
+$ az-pim list | az-pim deactivate set --config /dev/stdin
+2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Storage Blob Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
+$

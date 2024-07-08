@@ -1,0 +1,4 @@
+$ # In bash shell
+$ eval $(az-pim init bash)
+$ # In zsh shell
+$ source <(az-pim init zsh)
