@@ -1,0 +1,19 @@
+$ az-pim role assignment list --subscription 00000000-0000-0000-0000-000000000000
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount/providers/Microsoft.Authorization/roleAssignments/00000000-0000-0000-0000-000000000001",
+    "name": "00000000-0000-0000-0000-000000000001",
+    "properties": {
+      "createdOn": "2024-07-03T17:06:36.5812308Z",
+      "createdBy": "00000000-0000-0000-0000-000000000002",
+      "updatedOn": "2024-07-03T17:06:36.5812308Z",
+      "updatedBy": "00000000-0000-0000-0000-000000000003",
+      "roleDefinitionId": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000004",
+      "principalId": "00000000-0000-0000-0000-000000000005",
+      "principalType": "ServicePrincipal",
+      "scope": "/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+    },
+    "type": "Microsoft.Authorization/roleAssignments"
+  }
+]
+$

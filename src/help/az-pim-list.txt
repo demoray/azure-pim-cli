@@ -1,0 +1,22 @@
+$ az-pim list
+[
+  {
+    "role": "Owner",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "My Subscription"
+  },
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "My Subscription"
+  }
+]
+$ az-pim list --active
+[
+  {
+    "role": "Storage Blob Data Contributor",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+    "scope_name": "My Subscription"
+  }
+]
+$
