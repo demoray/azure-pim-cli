@@ -610,7 +610,7 @@ Options:
 ##### Example Usage
 
 ```
-$ az-pim role assignment  delete-orphan-entries --subscription 00000000-0000-0000-0000-000000000001
+$ az-pim role assignment delete-orphan-entries --subscription 00000000-0000-0000-0000-000000000001
 2024-07-09T18:00:48.903483Z  INFO azure_pim_cli: listing assignments
 2024-07-09T18:00:49.066017Z  INFO az_pim: Are you sure you want to delete role 558e61ce-6981-5b70-afc0-c9ca9cdccd8f? (y/n):
 y
