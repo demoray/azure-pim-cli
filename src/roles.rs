@@ -8,20 +8,23 @@ use std::{
 };
 use uuid::Uuid;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParseError;
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "unable to parse role or scope")
-    }
+#[derive(thiserror::Error, Debug)]
+pub enum ScopeError {
+    #[error("scope must start with a /")]
+    LeadingSlash,
 }
 
-impl std::error::Error for ParseError {}
-
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Deserialize)]
-pub struct Scope(pub String);
+pub struct Scope(pub(crate) String);
 impl Scope {
+    pub fn new<S: Into<String>>(value: S) -> Result<Self, ScopeError> {
+        let value = value.into();
+        if !value.starts_with('/') {
+            return Err(ScopeError::LeadingSlash);
+        }
+        Ok(Self(value))
+    }
+
     #[must_use]
     pub fn from_subscription(subscription_id: &Uuid) -> Self {
         Self(format!("/subscriptions/{subscription_id}"))
@@ -40,6 +43,22 @@ impl Scope {
             "/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/{provider}"
         ))
     }
+
+    #[must_use]
+    pub fn is_subscription(&self) -> bool {
+        self.0.starts_with("/subscriptions/") && !self.0.contains("/resourceGroups/")
+    }
+
+    #[must_use]
+    pub fn subscription(&self) -> Option<Uuid> {
+        let entries = self.0.split('/').collect::<Vec<_>>();
+        let first = entries.get(1)?;
+        if first != &"subscriptions" {
+            return None;
+        }
+        let id = entries.get(2)?;
+        Uuid::parse_str(id).ok()
+    }
 }
 
 impl Display for Scope {
@@ -49,9 +68,9 @@ impl Display for Scope {
 }
 
 impl FromStr for Scope {
-    type Err = ParseError;
+    type Err = ScopeError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(Self(s.to_string()))
+        Self::new(s.to_string())
     }
 }
 
@@ -64,7 +83,7 @@ impl Display for Role {
 }
 
 impl FromStr for Role {
-    type Err = ParseError;
+    type Err = ScopeError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(Self(s.to_string()))
     }
@@ -189,9 +208,10 @@ impl RoleAssignment {
 
 #[cfg(test)]
 mod tests {
-    use super::RoleAssignments;
+    use super::{RoleAssignments, Scope};
     use anyhow::Result;
     use insta::assert_json_snapshot;
+    use uuid::Uuid;
 
     #[test]
     fn parse_active() -> Result<()> {
@@ -199,5 +219,16 @@ mod tests {
         let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
         assert_json_snapshot!(&assignments);
         Ok(())
+    }
+
+    #[test]
+    fn test_scope() {
+        let uuid = Uuid::now_v7();
+        let scope = Scope::from_subscription(&uuid);
+        assert!(scope.is_subscription());
+        assert_eq!(scope.subscription(), Some(uuid));
+        let scope = Scope::from_resource_group(&uuid, "rg");
+        assert!(!scope.is_subscription());
+        assert_eq!(scope.subscription(), Some(uuid));
     }
 }
