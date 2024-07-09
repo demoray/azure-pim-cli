@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use azure_pim_cli::{
+    assignments::Assignment,
     check_latest_version,
     interactive::{interactive_ui, Selected},
     roles::{Role, RoleAssignments, Scope},
@@ -13,13 +14,13 @@ use std::{
     cmp::min,
     collections::BTreeSet,
     error::Error,
-    fs::File,
-    io::{stderr, stdout},
+    fs::{read, File},
+    io::{stderr, stdin, stdout},
     path::PathBuf,
     str::FromStr,
     time::Duration,
 };
-use tracing::debug;
+use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
@@ -72,6 +73,15 @@ impl Cmd {
             "az-pim role assignment list" => {
                 Some(include_str!("../help/az-pim-role-assignment-list.txt"))
             }
+            "az-pim role assignment delete <ASSIGNMENT_NAME>" => {
+                Some(include_str!("../help/az-pim-role-assignment-delete.txt"))
+            }
+            "az-pim role assignment delete-set <CONFIG>" => Some(include_str!(
+                "../help/az-pim-role-assignment-delete-set.txt"
+            )),
+            "az-pim role assignment delete-orphan-entries" => Some(include_str!(
+                "../help/az-pim-role-assignment-delete-orphan-entries.txt"
+            )),
             "az-pim role definition list" => {
                 Some(include_str!("../help/az-pim-role-definition-list.txt"))
             }
@@ -430,10 +440,93 @@ enum AssignmentSubCommand {
         #[arg(long, requires = "subscription")]
         resource_group: Option<String>,
 
+        /// Provider
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
         /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group"])]
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
         scope: Option<Scope>,
     },
+
+    /// Delete an assignment
+    Delete {
+        /// Assignment name
+        assignment_name: String,
+
+        /// Subscription
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// Resource Group
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// Provider
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
+        /// Specify scope directly
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
+        scope: Option<Scope>,
+    },
+
+    /// Delete a set of assignments
+    DeleteSet {
+        #[clap(value_hint = ValueHint::FilePath)]
+        /// Path to a JSON config file containing a set of assignments to delete
+        config: PathBuf,
+    },
+
+    /// Delete assignments that objects in Microsoft Graph cannot be found
+    DeleteOrphanEntries {
+        /// Subscription
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// Resource Group
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// Provider
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
+        /// Specify scope directly
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
+        scope: Option<Scope>,
+
+        /// Always respond yes to confirmations
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+fn choice(msg: &str) -> bool {
+    info!("Are you sure you want to {msg}? (y/n): ");
+    loop {
+        let mut input = String::new();
+        let Ok(_) = stdin().read_line(&mut input) else {
+            continue;
+        };
+        match input.trim().to_lowercase().as_str() {
+            "y" => break true,
+            "n" => break false,
+            _ => {
+                warn!("Please enter 'y' or 'n': ");
+            }
+        }
+    }
 }
 
 impl AssignmentSubCommand {
@@ -443,13 +536,64 @@ impl AssignmentSubCommand {
                 subscription,
                 resource_group,
                 scope,
+                provider,
             } => {
                 let client = PimClient::new()?;
-                let scope = build_scope(subscription, resource_group, scope)?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?;
                 let objects = client
                     .list_assignments(&scope)
                     .context("unable to list active assignments")?;
                 output(&objects)?;
+            }
+            Self::Delete {
+                assignment_name,
+                subscription,
+                resource_group,
+                scope,
+                provider,
+            } => {
+                let client = PimClient::new()?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?;
+                client
+                    .delete_assignment(&scope, &assignment_name)
+                    .context("unable to delete assignment")?;
+            }
+            Self::DeleteSet { config } => {
+                let client = PimClient::new()?;
+                let data = read(config)?;
+                let entries = serde_json::from_slice::<Vec<Assignment>>(&data)
+                    .context("unable to parse config file")?;
+                for entry in entries {
+                    client
+                        .delete_assignment(&entry.properties.scope, &entry.name)
+                        .context("unable to delete assignment")?;
+                }
+            }
+            Self::DeleteOrphanEntries {
+                subscription,
+                resource_group,
+                provider,
+                scope,
+                yes,
+            } => {
+                let client = PimClient::new()?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?;
+                let mut objects = client
+                    .list_assignments(&scope)
+                    .context("unable to list active assignments")?;
+                debug!("{} total entries", objects.len());
+                objects.retain(|x| x.object.is_none());
+                debug!("{} orphaned entries", objects.len());
+                for entry in objects {
+                    if !yes && !choice(&format!("delete role {}", entry.name)) {
+                        info!("skipping {}", entry.name);
+                        continue;
+                    }
+
+                    client
+                        .delete_assignment(&entry.properties.scope, &entry.name)
+                        .context("unable to delete assignment")?;
+                }
             }
         }
         Ok(())
@@ -470,8 +614,14 @@ enum DefinitionSubCommand {
         #[arg(long, requires = "subscription")]
         resource_group: Option<String>,
 
+        /// Provider
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
         /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group"])]
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
         scope: Option<Scope>,
     },
 }
@@ -482,9 +632,10 @@ impl DefinitionSubCommand {
                 subscription,
                 resource_group,
                 scope,
+                provider,
             } => {
                 let client = PimClient::new()?;
-                let scope = build_scope(subscription, resource_group, scope)?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?;
                 output(&client.role_definitions(&scope)?)?;
             }
         }
@@ -636,13 +787,17 @@ fn build_scope(
     subscription: Option<Uuid>,
     resource_group: Option<String>,
     scope: Option<Scope>,
+    provider: Option<String>,
 ) -> Result<Scope> {
-    match (subscription, resource_group, scope) {
-        (Some(subscription), Some(group), None) => {
+    match (subscription, resource_group, provider, scope) {
+        (Some(subscription), Some(group), Some(provider), None) => {
+            Ok(Scope::from_provider(&subscription, &group, &provider))
+        }
+        (Some(subscription), Some(group), None, None) => {
             Ok(Scope::from_resource_group(&subscription, &group))
         }
-        (Some(subscription), None, None) => Ok(Scope::from_subscription(&subscription)),
-        (None, None, Some(scope)) => Ok(scope),
+        (Some(subscription), None, None, None) => Ok(Scope::from_subscription(&subscription)),
+        (None, None, None, Some(scope)) => Ok(scope),
         _ => {
             bail!("invalid scope");
         }
