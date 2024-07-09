@@ -581,12 +581,23 @@ impl AssignmentSubCommand {
                 let mut objects = client
                     .list_assignments(&scope)
                     .context("unable to list active assignments")?;
+                let definitions = client.role_definitions(&scope)?;
                 debug!("{} total entries", objects.len());
                 objects.retain(|x| x.object.is_none());
                 debug!("{} orphaned entries", objects.len());
                 for entry in objects {
-                    if !yes && !choice(&format!("delete role {}", entry.name)) {
-                        info!("skipping {}", entry.name);
+                    let definition = definitions
+                        .iter()
+                        .find(|x| x.id == entry.properties.role_definition_id);
+                    let value = format!(
+                        "role:\"{}\" principal:{} (type: {}) scope:{}",
+                        definition.map_or(entry.name.as_str(), |x| x.properties.role_name.as_str()),
+                        entry.properties.principal_id,
+                        entry.properties.principal_type,
+                        entry.properties.scope
+                    );
+                    if !yes && !choice(&format!("delete {value}")) {
+                        info!("skipping {value}");
                         continue;
                     }
 
