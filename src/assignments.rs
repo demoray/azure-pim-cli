@@ -1,4 +1,5 @@
 use crate::graph::Object;
+use crate::roles::Scope;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -41,7 +42,7 @@ pub struct Properties {
     pub delegated_managed_identity_resource_id: Option<String>,
     pub principal_id: String,
     pub principal_type: String,
-    pub scope: String,
+    pub scope: Scope,
 }
 
 #[cfg(test)]
