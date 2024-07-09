@@ -589,10 +589,9 @@ impl AssignmentSubCommand {
                     let definition = definitions
                         .iter()
                         .find(|x| x.id == entry.properties.role_definition_id);
-                    let role_name =
-                        definition.map_or(entry.name.as_str(), |x| x.properties.role_name.as_str());
                     let value = format!(
-                        "role:\"{role_name}\" principal:{} (type: {}) scope:{}",
+                        "role:\"{}\" principal:{} (type: {}) scope:{}",
+                        definition.map_or(entry.name.as_str(), |x| x.properties.role_name.as_str()),
                         entry.properties.principal_id,
                         entry.properties.principal_type,
                         entry.properties.scope
