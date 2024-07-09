@@ -64,11 +64,11 @@ impl FromStr for Role {
 }
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Default, Clone)]
-pub struct Assignments(pub BTreeSet<Assignment>);
+pub struct RoleAssignments(pub BTreeSet<RoleAssignment>);
 
-impl Assignments {
+impl RoleAssignments {
     #[must_use]
-    pub fn find(&self, role: &Role, scope: &Scope) -> Option<&Assignment> {
+    pub fn find(&self, role: &Role, scope: &Scope) -> Option<&RoleAssignment> {
         let scope = scope.0.to_lowercase();
         let role = role.0.to_lowercase();
         self.0
@@ -82,7 +82,7 @@ impl Assignments {
     }
 
     #[must_use]
-    pub fn contains(&self, entry: &Assignment) -> bool {
+    pub fn contains(&self, entry: &RoleAssignment) -> bool {
         self.0.contains(entry)
     }
 
@@ -99,13 +99,13 @@ impl Assignments {
             .join("\n")
     }
 
-    pub(crate) fn insert(&mut self, entry: Assignment) -> bool {
+    pub(crate) fn insert(&mut self, entry: RoleAssignment) -> bool {
         self.0.insert(entry)
     }
 
     pub(crate) fn retain<F>(&mut self, f: F)
     where
-        F: FnMut(&Assignment) -> bool,
+        F: FnMut(&RoleAssignment) -> bool,
     {
         self.0.retain(f);
     }
@@ -150,7 +150,7 @@ impl Assignments {
                 bail!("no role definition id: {entry:#?}");
             };
 
-            results.insert(Assignment {
+            results.insert(RoleAssignment {
                 role,
                 scope,
                 scope_name,
@@ -163,7 +163,7 @@ impl Assignments {
 }
 
 #[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
-pub struct Assignment {
+pub struct RoleAssignment {
     pub role: Role,
     pub scope: Scope,
     pub scope_name: String,
@@ -171,7 +171,7 @@ pub struct Assignment {
     pub role_definition_id: String,
 }
 
-impl Assignment {
+impl RoleAssignment {
     pub(crate) fn friendly(&self) -> String {
         format!(
             "\"{}\" in \"{}\" ({})",
@@ -182,14 +182,14 @@ impl Assignment {
 
 #[cfg(test)]
 mod tests {
-    use super::Assignments;
+    use super::RoleAssignments;
     use anyhow::Result;
     use insta::assert_json_snapshot;
 
     #[test]
     fn parse_active() -> Result<()> {
         const ASSIGNMENTS: &str = include_str!("../tests/data/role-assignments.json");
-        let assignments = Assignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
+        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }

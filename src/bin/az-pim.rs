@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
-    roles::{Assignments, Role, Scope},
+    roles::{Role, RoleAssignments, Scope},
     PimClient,
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
@@ -241,8 +241,10 @@ impl ActivateSubCommand {
                 client.activate_assignment(entry, &justification, duration.into())?;
 
                 if let Some(wait) = wait {
-                    client
-                        .wait_for_activation(&Assignments([entry.clone()].into()), wait.into())?;
+                    client.wait_for_activation(
+                        &RoleAssignments([entry.clone()].into()),
+                        wait.into(),
+                    )?;
                 }
             }
             Self::Set {
@@ -533,7 +535,7 @@ fn build_set(
     config: Option<PathBuf>,
     role: Option<Vec<(Role, Scope)>>,
     active: bool,
-) -> Result<Assignments> {
+) -> Result<RoleAssignments> {
     let mut desired_roles = role.unwrap_or_default();
 
     if let Some(path) = config {
@@ -563,7 +565,7 @@ fn build_set(
         to_add.insert(entry);
     }
 
-    Ok(Assignments(to_add.into_iter().cloned().collect()))
+    Ok(RoleAssignments(to_add.into_iter().cloned().collect()))
 }
 
 #[derive(Args)]
