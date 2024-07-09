@@ -72,7 +72,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn list_eligible_assignments(&self) -> Result<RoleAssignments> {
+    pub fn list_eligible_role_assignments(&self) -> Result<RoleAssignments> {
         info!("listing eligible assignments");
         let response = self
             .backend
@@ -84,7 +84,7 @@ impl PimClient {
     }
 
     /// List the roles active role assignments for the current user
-    pub fn list_active_assignments(&self) -> Result<RoleAssignments> {
+    pub fn list_active_role_assignments(&self) -> Result<RoleAssignments> {
         info!("listing active assignments");
         let response = self
             .backend
@@ -99,7 +99,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn extend_assignment(
+    pub fn extend_role_assignment(
         &self,
         assignment: &RoleAssignment,
         justification: &str,
@@ -142,7 +142,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn activate_assignment(
+    pub fn activate_role_assignment(
         &self,
         assignment: &RoleAssignment,
         justification: &str,
@@ -182,7 +182,7 @@ impl PimClient {
         Ok(())
     }
 
-    pub fn activate_assignment_set(
+    pub fn activate_role_assignment_set(
         &self,
         assignments: &RoleAssignments,
         justification: &str,
@@ -198,7 +198,7 @@ impl PimClient {
             .clone()
             .into_par_iter()
             .map(
-                |entry| match self.activate_assignment(&entry, justification, duration) {
+                |entry| match self.activate_role_assignment(&entry, justification, duration) {
                     Ok(()) => ActivationResult::Success,
                     Err(error) => {
                         error!(
@@ -236,7 +236,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn deactivate_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
+    pub fn deactivate_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
         let RoleAssignment {
             scope,
             role_definition_id,
@@ -264,7 +264,7 @@ impl PimClient {
         Ok(())
     }
 
-    pub fn deactivate_assignment_set(
+    pub fn deactivate_role_assignment_set(
         &self,
         assignments: &RoleAssignments,
         concurrency: usize,
@@ -277,7 +277,7 @@ impl PimClient {
             .0
             .clone()
             .into_par_iter()
-            .map(|entry| match self.deactivate_assignment(&entry) {
+            .map(|entry| match self.deactivate_role_assignment(&entry) {
                 Ok(()) => ActivationResult::Success,
                 Err(error) => {
                     error!(
@@ -310,7 +310,7 @@ impl PimClient {
         Ok(())
     }
 
-    pub fn wait_for_activation(
+    pub fn wait_for_role_activation(
         &self,
         assignments: &RoleAssignments,
         wait_timeout: Duration,
@@ -343,7 +343,7 @@ impl PimClient {
             }
             last = Some(current);
 
-            let active = self.list_active_assignments()?;
+            let active = self.list_active_role_assignments()?;
             info!("active assignments: {active:#?}");
             waiting.retain(|entry| !active.contains(entry));
             info!("still waiting: {waiting:#?}");
