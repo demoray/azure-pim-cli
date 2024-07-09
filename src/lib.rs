@@ -344,9 +344,9 @@ impl PimClient {
             last = Some(current);
 
             let active = self.list_active_role_assignments()?;
-            info!("active assignments: {active:#?}");
+            debug!("active assignments: {active:#?}");
             waiting.retain(|entry| !active.contains(entry));
-            info!("still waiting: {waiting:#?}");
+            debug!("still waiting: {waiting:#?}");
         }
 
         if !waiting.is_empty() {
@@ -361,7 +361,7 @@ impl PimClient {
 
     /// List all assignments (not just those managed by PIM)
     pub fn list_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
-        info!("listing assignments");
+        info!("listing assignments for {scope}");
         let value = self
             .backend
             .request(Method::GET, Operation::RoleAssignments)
@@ -384,7 +384,7 @@ impl PimClient {
 
     /// List all assignments (not just those managed by PIM)
     pub fn role_definitions(&self, scope: &Scope) -> Result<Vec<Definition>> {
-        info!("listing role definitions");
+        info!("listing role definitions for {scope}");
         let definitions = self
             .backend
             .request(Method::GET, Operation::RoleDefinitions)
