@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
@@ -21,6 +21,7 @@ use std::{
 };
 use tracing::debug;
 use tracing_subscriber::filter::LevelFilter;
+use uuid::Uuid;
 
 // empirical testing shows we need to keep under 5 concurrent requests to keep
 // from rate limiting.  In the future, we may move to a model where we go as
@@ -98,6 +99,12 @@ enum SubCommand {
     Deactivate {
         #[clap(subcommand)]
         cmd: DeactivateSubCommand,
+    },
+
+    /// Manage Azure role-based access control (Azure RBAC).
+    Role {
+        #[clap(subcommand)]
+        cmd: RoleSubCommand,
     },
 
     /// Setup shell tab completions
@@ -394,6 +401,97 @@ impl DeactivateSubCommand {
     }
 }
 
+#[derive(Subcommand)]
+enum RoleSubCommand {
+    /// Manage role assignments
+    Assignment {
+        #[clap(subcommand)]
+        cmd: AssignmentSubCommand,
+    },
+
+    /// Manage role definitions
+    Definition {
+        #[clap(subcommand)]
+        cmd: DefinitionSubCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AssignmentSubCommand {
+    /// List assignments
+    List {
+        /// Subscription
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// Resource Group
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// Specify scope directly
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group"])]
+        scope: Option<Scope>,
+    },
+}
+
+impl AssignmentSubCommand {
+    fn run(self) -> Result<()> {
+        match self {
+            Self::List {
+                subscription,
+                resource_group,
+                scope,
+            } => {
+                let client = PimClient::new()?;
+                let scope = build_scope(subscription, resource_group, scope)?;
+                let objects = client
+                    .list_assignments(&scope)
+                    .context("unable to list active assignments")?;
+                output(&objects)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Subcommand)]
+enum DefinitionSubCommand {
+    /// List the definitions for the specific scope
+    List {
+        /// Limit the scope by the specified Subscription
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// Limit the scope by the specified Resource Group
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// Specify scope directly
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group"])]
+        scope: Option<Scope>,
+    },
+}
+impl DefinitionSubCommand {
+    fn run(self) -> Result<()> {
+        match self {
+            Self::List {
+                subscription,
+                resource_group,
+                scope,
+            } => {
+                let client = PimClient::new()?;
+                let scope = build_scope(subscription, resource_group, scope)?;
+                output(&client.role_definitions(&scope)?)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Parse a single key-value pair of `X=Y` into a typed tuple of `(X, Y)`.
 ///
 /// # Errors
@@ -519,6 +617,10 @@ fn main() -> Result<()> {
         }
         SubCommand::Activate { cmd } => cmd.run(),
         SubCommand::Deactivate { cmd } => cmd.run(),
+        SubCommand::Role { cmd } => match cmd {
+            RoleSubCommand::Assignment { cmd } => cmd.run(),
+            RoleSubCommand::Definition { cmd } => cmd.run(),
+        },
         SubCommand::Readme => {
             build_readme();
             Ok(())
@@ -526,6 +628,23 @@ fn main() -> Result<()> {
         SubCommand::Init { shell } => {
             Cmd::shell_completion(shell);
             Ok(())
+        }
+    }
+}
+
+fn build_scope(
+    subscription: Option<Uuid>,
+    resource_group: Option<String>,
+    scope: Option<Scope>,
+) -> Result<Scope> {
+    match (subscription, resource_group, scope) {
+        (Some(subscription), Some(group), None) => {
+            Ok(Scope::from_resource_group(&subscription, &group))
+        }
+        (Some(subscription), None, None) => Ok(Scope::from_subscription(&subscription)),
+        (None, None, Some(scope)) => Ok(scope),
+        _ => {
+            bail!("invalid scope");
         }
     }
 }

@@ -13,6 +13,7 @@ mod assignments;
 mod az_cli;
 mod backend;
 mod definitions;
+mod graph;
 pub mod interactive;
 mod latest;
 pub mod roles;
@@ -34,6 +35,16 @@ use std::{
 };
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+pub use crate::latest::check_latest_version;
+use crate::{
+    activate::check_error_response,
+    assignments::{Assignment, Assignments},
+    backend::Backend,
+    definitions::{Definition, Definitions},
+    graph::get_objects_by_ids,
+    roles::{RoleAssignment, RoleAssignments, Scope},
+};
 
 const WAIT_DELAY: Duration = Duration::from_secs(5);
 
@@ -353,6 +364,42 @@ impl PimClient {
         }
 
         Ok(())
+    }
+
+    /// List all assignments (not just those managed by PIM)
+    pub fn list_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
+        info!("listing assignments assignments");
+        let value = self
+            .backend
+            .request(Method::GET, Operation::RoleAssignments)
+            .scope(scope.clone())
+            .send()
+            .context("unable to list assignments")?;
+        let assignments: Assignments = serde_json::from_value(value)?;
+        let mut assignments = assignments.value;
+        let ids = assignments
+            .iter()
+            .map(|x| x.properties.principal_id.as_str())
+            .collect();
+
+        let objects = get_objects_by_ids(self, ids).context("getting objects by id")?;
+        for x in &mut assignments {
+            x.object = objects.get(&x.properties.principal_id).cloned();
+        }
+        Ok(assignments)
+    }
+
+    /// List all assignments (not just those managed by PIM)
+    pub fn role_definitions(&self, scope: &Scope) -> Result<Vec<Definition>> {
+        info!("listing role definitions");
+        let definitions = self
+            .backend
+            .request(Method::GET, Operation::RoleDefinitions)
+            .scope(scope.clone())
+            .send()
+            .context("unable to list role definitions")?;
+        let definitions: Definitions = serde_json::from_value(definitions)?;
+        Ok(definitions.value)
     }
 }
 

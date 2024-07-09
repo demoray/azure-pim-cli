@@ -72,7 +72,7 @@ macro_rules! try_or_stop {
 }
 
 pub(crate) struct Backend {
-    client: Client,
+    pub(crate) client: Client,
     tokens: Mutex<BTreeMap<TokenScope, String>>,
 }
 
@@ -89,7 +89,7 @@ impl Backend {
         extract_oid(&mgmt_token).context("unable to obtain the current user")
     }
 
-    fn get_token(&self, scope: TokenScope) -> Result<String> {
+    pub(crate) fn get_token(&self, scope: TokenScope) -> Result<String> {
         let mut tokens = self.tokens.lock();
         if let Some(token) = tokens.get(&scope) {
             return Ok(token.clone());
