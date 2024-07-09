@@ -125,7 +125,7 @@ impl RoleAssignments {
             .join("\n")
     }
 
-    pub(crate) fn insert(&mut self, entry: RoleAssignment) -> bool {
+    pub fn insert(&mut self, entry: RoleAssignment) -> bool {
         self.0.insert(entry)
     }
 
