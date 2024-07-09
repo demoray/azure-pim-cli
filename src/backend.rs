@@ -20,7 +20,7 @@ use tracing::{debug, trace};
 const RETRY_COUNT: usize = 10;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[allow(clippy::enum_variant_names)]
+#[allow(clippy::enum_variant_names, dead_code)]
 pub(crate) enum Operation {
     RoleAssignments,
     RoleAssignmentScheduleInstances,
