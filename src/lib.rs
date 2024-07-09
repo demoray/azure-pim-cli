@@ -21,7 +21,7 @@ pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
     backend::Backend,
-    roles::{Assignment, Assignments},
+    roles::{RoleAssignment, RoleAssignments},
 };
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;
@@ -39,7 +39,7 @@ const WAIT_DELAY: Duration = Duration::from_secs(5);
 
 pub enum ActivationResult {
     Success,
-    Failed(Assignment),
+    Failed(RoleAssignment),
 }
 
 pub struct PimClient {
@@ -68,7 +68,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn list_eligible_assignments(&self) -> Result<Assignments> {
+    pub fn list_eligible_assignments(&self) -> Result<RoleAssignments> {
         info!("listing eligible assignments");
         let response = self
             .backend
@@ -76,11 +76,11 @@ impl PimClient {
             .query(&[("$filter", "asTarget()")])
             .send()
             .context("unable to list eligible assignments")?;
-        Assignments::parse(&response).context("unable to parse eligible assignments")
+        RoleAssignments::parse(&response).context("unable to parse eligible assignments")
     }
 
     /// List the roles active role assignments for the current user
-    pub fn list_active_assignments(&self) -> Result<Assignments> {
+    pub fn list_active_assignments(&self) -> Result<RoleAssignments> {
         info!("listing active assignments");
         let response = self
             .backend
@@ -88,7 +88,7 @@ impl PimClient {
             .query(&[("$filter", "asTarget()")])
             .send()
             .context("unable to list active assignments")?;
-        Assignments::parse(&response).context("unable to parse active assignments")
+        RoleAssignments::parse(&response).context("unable to parse active assignments")
     }
 
     /// Request extending the specified role eligibility
@@ -97,11 +97,11 @@ impl PimClient {
     /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn extend_assignment(
         &self,
-        assignment: &Assignment,
+        assignment: &RoleAssignment,
         justification: &str,
         duration: Duration,
     ) -> Result<()> {
-        let Assignment {
+        let RoleAssignment {
             scope,
             role_definition_id,
             role,
@@ -140,11 +140,11 @@ impl PimClient {
     /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn activate_assignment(
         &self,
-        assignment: &Assignment,
+        assignment: &RoleAssignment,
         justification: &str,
         duration: Duration,
     ) -> Result<()> {
-        let Assignment {
+        let RoleAssignment {
             scope,
             role_definition_id,
             role,
@@ -180,7 +180,7 @@ impl PimClient {
 
     pub fn activate_assignment_set(
         &self,
-        assignments: &Assignments,
+        assignments: &RoleAssignments,
         justification: &str,
         duration: Duration,
         concurrency: usize,
@@ -207,7 +207,7 @@ impl PimClient {
             )
             .collect::<Vec<_>>();
 
-        let mut failed = Assignments::default();
+        let mut failed = RoleAssignments::default();
 
         for result in results {
             match result {
@@ -232,8 +232,8 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn deactivate_assignment(&self, assignment: &Assignment) -> Result<()> {
-        let Assignment {
+    pub fn deactivate_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
+        let RoleAssignment {
             scope,
             role_definition_id,
             role,
@@ -262,7 +262,7 @@ impl PimClient {
 
     pub fn deactivate_assignment_set(
         &self,
-        assignments: &Assignments,
+        assignments: &RoleAssignments,
         concurrency: usize,
     ) -> Result<()> {
         ensure!(!assignments.0.is_empty(), "no roles specified");
@@ -285,7 +285,7 @@ impl PimClient {
             })
             .collect::<Vec<_>>();
 
-        let mut failed = Assignments::default();
+        let mut failed = RoleAssignments::default();
 
         for result in results {
             match result {
@@ -308,7 +308,7 @@ impl PimClient {
 
     pub fn wait_for_activation(
         &self,
-        assignments: &Assignments,
+        assignments: &RoleAssignments,
         wait_timeout: Duration,
     ) -> Result<()> {
         if assignments.is_empty() {

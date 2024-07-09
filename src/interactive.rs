@@ -1,4 +1,4 @@
-use crate::roles::{Assignment, Assignments};
+use crate::roles::{RoleAssignment, RoleAssignments};
 use anyhow::Result;
 use ratatui::{
     crossterm::{
@@ -27,13 +27,13 @@ const ALL_HELP: &str = "Tab or Shift-Tab to change sections | Enter to activate 
 const ITEM_HEIGHT: u16 = 2;
 
 pub struct Selected {
-    pub assignments: Assignments,
+    pub assignments: RoleAssignments,
     pub justification: String,
     pub duration: u64,
 }
 
 struct Entry {
-    value: Assignment,
+    value: RoleAssignment,
     enabled: bool,
 }
 
@@ -57,7 +57,7 @@ struct App {
 
 impl App {
     fn new(
-        assignments: Assignments,
+        assignments: RoleAssignments,
         justification: Option<String>,
         duration: Option<u64>,
     ) -> Result<Self> {
@@ -354,7 +354,7 @@ impl App {
                                 .map(|entry| entry.value)
                                 .collect();
                             return Ok(Some(Selected {
-                                assignments: Assignments(items),
+                                assignments: RoleAssignments(items),
                                 justification: self.justification.unwrap_or_default(),
                                 duration: self.duration.unwrap_or_default(),
                             }));
@@ -369,7 +369,7 @@ impl App {
 }
 
 pub fn interactive_ui(
-    items: Assignments,
+    items: RoleAssignments,
     justification: Option<String>,
     duration: Option<u64>,
 ) -> Result<Option<Selected>> {
@@ -392,7 +392,7 @@ pub fn interactive_ui(
     res
 }
 
-fn column_widths(items: &Assignments) -> Result<(u16, u16)> {
+fn column_widths(items: &RoleAssignments) -> Result<(u16, u16)> {
     let (scope_name_len, role_len, scope_len) =
         items
             .0
