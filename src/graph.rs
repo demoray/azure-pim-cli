@@ -64,7 +64,6 @@ fn get_objects_by_ids_small(pim_client: &PimClient, ids: &[&&str]) -> Result<Vec
     Ok(results)
 }
 
-#[allow(dead_code)]
 pub(crate) fn get_objects_by_ids(
     pim_client: &PimClient,
     ids: BTreeSet<&str>,

@@ -9,6 +9,7 @@ Commands:
   list        List active or eligible assignments
   activate    Activate roles
   deactivate  Deactivate roles
+  role        Manage Azure role-based access control (Azure RBAC)
   init        Setup shell tab completions
 
 Options:
@@ -388,6 +389,221 @@ Options:
           Print help (see a summary with '-h')
 
 ```
+## az-pim role
+
+```
+Manage Azure role-based access control (Azure RBAC)
+
+Usage: role [OPTIONS] <COMMAND>
+
+Commands:
+  assignment  Manage role assignments
+  definition  Manage role definitions
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+### az-pim role assignment
+
+```
+Manage role assignments
+
+Usage: assignment [OPTIONS] <COMMAND>
+
+Commands:
+  list  List assignments
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+#### az-pim role assignment list
+
+```
+List assignments
+
+Usage: list [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Subscription
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Resource Group
+
+          This argument requires `subscription` to be set.
+
+      --scope <SCOPE>
+          Specify scope directly
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+##### Example Usage
+
+```
+$ az-pim role assignment list --subscription 00000000-0000-0000-0000-000000000000
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount/providers/Microsoft.Authorization/roleAssignments/00000000-0000-0000-0000-000000000001",
+    "name": "00000000-0000-0000-0000-000000000001",
+    "properties": {
+      "createdOn": "2024-07-03T17:06:36.5812308Z",
+      "createdBy": "00000000-0000-0000-0000-000000000002",
+      "updatedOn": "2024-07-03T17:06:36.5812308Z",
+      "updatedBy": "00000000-0000-0000-0000-000000000003",
+      "roleDefinitionId": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000004",
+      "principalId": "00000000-0000-0000-0000-000000000005",
+      "principalType": "ServicePrincipal",
+      "scope": "/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+    },
+    "type": "Microsoft.Authorization/roleAssignments"
+  }
+]
+$
+```
+
+### az-pim role definition
+
+```
+Manage role definitions
+
+Usage: definition [OPTIONS] <COMMAND>
+
+Commands:
+  list  List the definitions for the specific scope
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+#### az-pim role definition list
+
+```
+List the definitions for the specific scope
+
+Usage: list [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Limit the scope by the specified Subscription
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Limit the scope by the specified Resource Group
+
+          This argument requires `subscription` to be set.
+
+      --scope <SCOPE>
+          Specify scope directly
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+##### Example Usage
+
+```
+$ az-pim role definition list --subscription 00000000-0000-0000-0000-000000000000
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000001",
+    "name": "00000000-0000-0000-0000-000000000001",
+    "properties": {
+      "assignableScopes": [
+        "/"
+      ],
+      "createdOn": "2018-11-29T18:46:55.0492387Z",
+      "updatedOn": "2018-11-29T18:46:55.0492387Z",
+      "description": "my custom role",
+      "permissions": [
+        {
+          "actions": [
+            "Microsoft.Compute/*/read",
+            "Microsoft.Network/*/read"
+          ],
+          "notActions": [],
+          "dataActions": [],
+          "notDataActions": []
+        }
+      ],
+      "roleName": "my custom name",
+      "type": "CustomRole"
+    },
+    "type": "Microsoft.Authorization/roleDefinitions"
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000007",
+    "name": "00000000-0000-0000-0000-000000000007",
+    "properties": {
+      "assignableScopes": [
+        "/"
+      ],
+      "createdOn": "2017-12-21T00:01:24.7972312Z",
+      "updatedOn": "2021-11-11T20:13:54.9397456Z",
+      "description": "Allows for read, write and delete access to Azure Storage blob containers and data",
+      "permissions": [
+        {
+          "actions": [
+            "Microsoft.Storage/storageAccounts/blobServices/containers/delete",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/write",
+            "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action"
+          ],
+          "notActions": [],
+          "dataActions": [
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/move/action",
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
+          ],
+          "notDataActions": []
+        }
+      ],
+      "roleName": "Storage Blob Data Contributor",
+      "type": "BuiltInRole"
+    },
+    "type": "Microsoft.Authorization/roleDefinitions"
+  }
+]
+$
+```
+
 ## az-pim init <SHELL>
 
 ```

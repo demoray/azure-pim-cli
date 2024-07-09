@@ -1,3 +1,4 @@
+use crate::graph::Object;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -13,6 +14,8 @@ pub struct Assignment {
     pub properties: Properties,
     #[serde(rename = "type")]
     pub type_: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<Object>,
 }
 
 #[derive(Deserialize, Debug, Serialize)]
