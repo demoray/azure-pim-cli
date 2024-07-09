@@ -13,6 +13,7 @@ mod assignments;
 mod az_cli;
 mod backend;
 mod definitions;
+mod graph;
 pub mod interactive;
 mod latest;
 pub mod roles;
