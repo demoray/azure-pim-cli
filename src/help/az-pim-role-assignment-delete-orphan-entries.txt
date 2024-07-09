@@ -1,0 +1,9 @@
+$ az-pim role assignment delete-orphan-entries --subscription 00000000-0000-0000-0000-000000000001
+2024-07-09T18:00:48.903483Z  INFO azure_pim_cli: listing assignments
+2024-07-09T18:00:49.066017Z  INFO az_pim: Are you sure you want to delete role 558e61ce-6981-5b70-afc0-c9ca9cdccd8f? (y/n):
+y
+2024-07-09T18:00:51.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000001 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+2024-07-09T18:00:52.797752Z  INFO az_pim: Are you sure you want to delete role 1f366ebb-8f4a-524c-8668-02b6d76fdb17? (y/n):
+y
+2024-07-09T18:00:53.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000002 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+$

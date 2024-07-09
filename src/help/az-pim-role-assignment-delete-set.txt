@@ -1,0 +1,5 @@
+$ az-pim role assignment list --subscription 00000000-0000-0000-0000-000000000000 | jq 'map(select(.object | .==null)) [].id' | az-pim role assignment delete-set /dev/stdin
+2024-07-09T18:54:48.903483Z  INFO azure_pim_cli: listing assignments assignments
+2024-07-09T18:19:32.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000001 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+2024-07-09T18:19:32.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000002 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+$

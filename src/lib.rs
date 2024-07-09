@@ -9,7 +9,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod activate;
-mod assignments;
+pub mod assignments;
 mod az_cli;
 mod backend;
 mod definitions;
@@ -361,7 +361,7 @@ impl PimClient {
 
     /// List all assignments (not just those managed by PIM)
     pub fn list_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
-        info!("listing assignments assignments");
+        info!("listing assignments");
         let value = self
             .backend
             .request(Method::GET, Operation::RoleAssignments)
@@ -393,6 +393,17 @@ impl PimClient {
             .context("unable to list role definitions")?;
         let definitions: Definitions = serde_json::from_value(definitions)?;
         Ok(definitions.value)
+    }
+
+    pub fn delete_assignment(&self, scope: &Scope, assignment_name: &str) -> Result<()> {
+        info!("deleting assignment {assignment_name} from {scope}");
+        self.backend
+            .request(Method::DELETE, Operation::RoleAssignments)
+            .extra(format!("/{assignment_name}"))
+            .scope(scope.clone())
+            .send()
+            .context("unable to delete assignment")?;
+        Ok(())
     }
 }
 
