@@ -419,7 +419,10 @@ Manage role assignments
 Usage: assignment [OPTIONS] <COMMAND>
 
 Commands:
-  list  List assignments
+  list                   List assignments
+  delete                 Delete an assignment
+  delete-set             Delete a set of assignments
+  delete-orphan-entries  Delete assignments that objects in Microsoft Graph cannot be found
 
 Options:
       --verbose...
@@ -454,6 +457,11 @@ Options:
 
           This argument requires `subscription` to be set.
 
+      --provider <PROVIDER>
+          Provider
+
+          This argument requires `subscription` and `resource_group` to be set.
+
       --scope <SCOPE>
           Specify scope directly
 
@@ -482,6 +490,134 @@ $ az-pim role assignment list --subscription 00000000-0000-0000-0000-00000000000
     "type": "Microsoft.Authorization/roleAssignments"
   }
 ]
+$
+```
+
+#### az-pim role assignment delete <ASSIGNMENT_NAME>
+
+```
+Delete an assignment
+
+Usage: delete [OPTIONS] <ASSIGNMENT_NAME>
+
+Arguments:
+  <ASSIGNMENT_NAME>
+          Assignment name
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Subscription
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Resource Group
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Provider
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify scope directly
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+##### Example Usage
+
+```
+$ az-pim role assignment delete 00000000-0000-0000-0000-000000000000 --subscription 00000000-0000-0000-0000-000000000001
+$
+```
+
+#### az-pim role assignment delete-set <CONFIG>
+
+```
+Delete a set of assignments
+
+Usage: delete-set [OPTIONS] <CONFIG>
+
+Arguments:
+  <CONFIG>
+          Path to a JSON config file containing a set of assignments to delete
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+##### Example Usage
+
+```
+$ az-pim role assignment list --subscription 00000000-0000-0000-0000-000000000000 | jq 'map(select(.object | .==null)) [].id' | az-pim role assignment delete-set /dev/stdin
+2024-07-09T18:54:48.903483Z  INFO azure_pim_cli: listing assignments assignments
+2024-07-09T18:19:32.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000001 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+2024-07-09T18:19:32.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000002 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+$
+```
+
+#### az-pim role assignment delete-orphan-entries
+
+```
+Delete assignments that objects in Microsoft Graph cannot be found
+
+Usage: delete-orphan-entries [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Subscription
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Resource Group
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Provider
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify scope directly
+
+      --yes
+          Always respond yes to confirmations
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+##### Example Usage
+
+```
+$ az-pim role assignment  delete-orphan-entries --subscription 00000000-0000-0000-0000-000000000001
+2024-07-09T18:00:48.903483Z  INFO azure_pim_cli: listing assignments
+2024-07-09T18:00:49.066017Z  INFO az_pim: Are you sure you want to delete role 558e61ce-6981-5b70-afc0-c9ca9cdccd8f? (y/n):
+y
+2024-07-09T18:00:51.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000001 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+2024-07-09T18:00:52.797752Z  INFO az_pim: Are you sure you want to delete role 1f366ebb-8f4a-524c-8668-02b6d76fdb17? (y/n):
+y
+2024-07-09T18:00:53.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000002 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
 $
 ```
 
@@ -527,6 +663,11 @@ Options:
           Limit the scope by the specified Resource Group
 
           This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Provider
+
+          This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
           Specify scope directly

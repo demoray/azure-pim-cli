@@ -33,6 +33,13 @@ impl Scope {
             "/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
         ))
     }
+
+    #[must_use]
+    pub fn from_provider(subscription_id: &Uuid, resource_group: &str, provider: &str) -> Self {
+        Self(format!(
+            "/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/{provider}"
+        ))
+    }
 }
 
 impl Display for Scope {
