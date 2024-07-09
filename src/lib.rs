@@ -69,7 +69,8 @@ pub struct PimClient {
 
 impl PimClient {
     pub fn new() -> Result<Self> {
-        let token = get_token().context("unable to obtain access token")?;
+        let token =
+            get_token(az_cli::TokenScope::Management).context("unable to obtain access token")?;
         let principal_id = extract_oid(&token).context("unable to obtain the current user")?;
         Ok(Self {
             client: Client::new(),
