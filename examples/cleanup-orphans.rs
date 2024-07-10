@@ -55,7 +55,9 @@ fn main() -> Result<()> {
             continue;
         }
 
-        if role_assignment.role.0 != "Owner" {
+        if ["Owner", "Role Based Access Control Administrator"]
+            .contains(&role_assignment.role.0.as_str())
+        {
             continue;
         }
         info!("checking {}", role_assignment.scope_name);
