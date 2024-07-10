@@ -51,11 +51,11 @@ fn main() -> Result<()> {
     total.0.extend(active.0.clone());
 
     for role_assignment in total.0 {
-        if !role_assignment.scope.is_subscription() {
+        if role_assignment.scope.subscription().is_none() {
             continue;
         }
 
-        if ["Owner", "Role Based Access Control Administrator"]
+        if !["Owner", "Role Based Access Control Administrator"]
             .contains(&role_assignment.role.0.as_str())
         {
             continue;
