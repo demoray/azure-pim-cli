@@ -77,7 +77,7 @@ impl PimClient {
         let response = self
             .backend
             .request(Method::GET, Operation::RoleEligibilityScheduleInstances)
-            .query(&[("$filter", "asTarget()")])
+            .query("$filter", "asTarget()")
             .send()
             .context("unable to list eligible assignments")?;
         RoleAssignments::parse(&response).context("unable to parse eligible assignments")
@@ -89,7 +89,7 @@ impl PimClient {
         let response = self
             .backend
             .request(Method::GET, Operation::RoleAssignmentScheduleInstances)
-            .query(&[("$filter", "asTarget()")])
+            .query("$filter", "asTarget()")
             .send()
             .context("unable to list active assignments")?;
         RoleAssignments::parse(&response).context("unable to parse active assignments")

@@ -155,18 +155,19 @@ impl Backend {
 
 #[derive(Setters)]
 #[setters(strip_option)]
-pub(crate) struct RequestBuilder<'a, 'b> {
+pub(crate) struct RequestBuilder<'a> {
     backend: &'a Backend,
     method: Method,
     operation: Operation,
     extra: Option<String>,
     scope: Option<Scope>,
-    query: Option<&'b [(&'b str, &'b str)]>,
+    #[setters(skip)]
+    query: Option<Vec<(String, String)>>,
     json: Option<Value>,
     validate: Option<fn(StatusCode, &Value) -> Result<()>>,
 }
 
-impl<'a, 'b> RequestBuilder<'a, 'b> {
+impl<'a> RequestBuilder<'a> {
     pub(crate) fn new(backend: &'a Backend, method: Method, operation: Operation) -> Self {
         Self {
             backend,
@@ -178,6 +179,17 @@ impl<'a, 'b> RequestBuilder<'a, 'b> {
             json: None,
             validate: None,
         }
+    }
+
+    pub(crate) fn query<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.query
+            .get_or_insert_with(Vec::new)
+            .push((key.into(), value.into()));
+        self
     }
 
     pub(crate) fn send(self) -> Result<Value> {
