@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 static CACHE: Mutex<BTreeMap<String, Object>> = Mutex::new(BTreeMap::new());
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Object {
     pub id: String,
     pub display_name: String,

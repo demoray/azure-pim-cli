@@ -1,0 +1,13 @@
+---
+source: src/roles.rs
+expression: "&assignments"
+---
+[
+  {
+    "role": "Custom Role Name",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000001",
+    "scope_name": "azure-sub-name",
+    "principal_id": "00000000-0000-0000-0000-000000000002",
+    "principal_type": "User"
+  }
+]
