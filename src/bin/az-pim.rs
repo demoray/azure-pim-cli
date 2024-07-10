@@ -267,7 +267,7 @@ enum ActivateSubCommand {
 }
 
 impl ActivateSubCommand {
-    fn run(self) -> Result<()> {
+    fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::Role {
                 role,
@@ -276,7 +276,6 @@ impl ActivateSubCommand {
                 duration,
                 wait,
             } => {
-                let client = PimClient::new()?;
                 let roles = client
                     .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list eligible assignments")?;
@@ -300,8 +299,7 @@ impl ActivateSubCommand {
                 concurrency,
                 wait,
             } => {
-                let client = PimClient::new()?;
-                let set = build_set(&client, config, role, false)?;
+                let set = build_set(client, config, role, false)?;
                 client.activate_role_assignment_set(
                     &set,
                     &justification,
@@ -319,7 +317,6 @@ impl ActivateSubCommand {
                 duration,
                 wait,
             } => {
-                let client = PimClient::new()?;
                 let roles =
                     client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
                 if let Some(Selected {
@@ -409,10 +406,9 @@ enum DeactivateSubCommand {
 }
 
 impl DeactivateSubCommand {
-    fn run(self) -> Result<()> {
+    fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::Role { role, scope } => {
-                let client = PimClient::new()?;
                 let roles = client
                     .list_active_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list active assignments")?;
@@ -424,12 +420,10 @@ impl DeactivateSubCommand {
                 role,
                 concurrency,
             } => {
-                let client = PimClient::new()?;
-                let set = build_set(&client, config, role, true)?;
+                let set = build_set(client, config, role, true)?;
                 client.deactivate_role_assignment_set(&set, concurrency)?;
             }
             Self::Interactive { concurrency } => {
-                let client = PimClient::new()?;
                 let roles =
                     client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
                 if let Some(Selected { assignments, .. }) = interactive_ui(roles, None, None)? {
@@ -560,7 +554,7 @@ fn choice(msg: &str) -> bool {
 }
 
 impl AssignmentSubCommand {
-    fn run(self) -> Result<()> {
+    fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::List {
                 subscription,
@@ -568,7 +562,6 @@ impl AssignmentSubCommand {
                 scope,
                 provider,
             } => {
-                let client = PimClient::new()?;
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 let objects = client
@@ -583,7 +576,6 @@ impl AssignmentSubCommand {
                 scope,
                 provider,
             } => {
-                let client = PimClient::new()?;
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 client
@@ -591,7 +583,6 @@ impl AssignmentSubCommand {
                     .context("unable to delete assignment")?;
             }
             Self::DeleteSet { config } => {
-                let client = PimClient::new()?;
                 let data = read(config)?;
                 let entries = serde_json::from_slice::<Vec<Assignment>>(&data)
                     .context("unable to parse config file")?;
@@ -608,7 +599,6 @@ impl AssignmentSubCommand {
                 scope,
                 yes,
             } => {
-                let client = PimClient::new()?;
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 let mut objects = client
@@ -670,7 +660,7 @@ enum DefinitionSubCommand {
     },
 }
 impl DefinitionSubCommand {
-    fn run(self) -> Result<()> {
+    fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::List {
                 subscription,
@@ -678,7 +668,6 @@ impl DefinitionSubCommand {
                 scope,
                 provider,
             } => {
-                let client = PimClient::new()?;
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 output(&client.role_definitions(&scope)?)?;
@@ -801,6 +790,8 @@ fn main() -> Result<()> {
         debug!("unable to check latest version: {err}");
     }
 
+    let client = PimClient::new()?;
+
     match args.command {
         SubCommand::List {
             active,
@@ -812,7 +803,6 @@ fn main() -> Result<()> {
         } => {
             let scope = build_scope(subscription, resource_group, scope, provider)?;
 
-            let client = PimClient::new()?;
             let roles = if active {
                 client.list_active_role_assignments(scope, Some(filter))?
             } else {
@@ -820,11 +810,11 @@ fn main() -> Result<()> {
             };
             output(&roles)
         }
-        SubCommand::Activate { cmd } => cmd.run(),
-        SubCommand::Deactivate { cmd } => cmd.run(),
+        SubCommand::Activate { cmd } => cmd.run(&client),
+        SubCommand::Deactivate { cmd } => cmd.run(&client),
         SubCommand::Role { cmd } => match cmd {
-            RoleSubCommand::Assignment { cmd } => cmd.run(),
-            RoleSubCommand::Definition { cmd } => cmd.run(),
+            RoleSubCommand::Assignment { cmd } => cmd.run(&client),
+            RoleSubCommand::Definition { cmd } => cmd.run(&client),
         },
         SubCommand::Readme => {
             build_readme();
