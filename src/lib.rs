@@ -1,11 +1,11 @@
-#![forbid(
-    unsafe_code,
-    clippy::unwrap_used,
-    clippy::expect_used,
+#![forbid(unsafe_code)]
+#![deny(
+    clippy::indexing_slicing,
+    clippy::manual_assert,
     clippy::panic,
-    clippy::manual_assert
+    clippy::expect_used,
+    clippy::unwrap_used
 )]
-#![deny(clippy::indexing_slicing)]
 #![allow(clippy::module_name_repetitions)]
 
 mod activate;
@@ -29,9 +29,12 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;
+use clap::ValueEnum;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use reqwest::Method;
 use std::{
+    collections::BTreeSet,
+    fmt::{Display, Formatter, Result as FmtResult},
     sync::Once,
     thread::sleep,
     time::{Duration, Instant},
@@ -41,10 +44,26 @@ use uuid::Uuid;
 
 const WAIT_DELAY: Duration = Duration::from_secs(5);
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(clippy::large_enum_variant)]
+pub enum ActivationResult {
+    Success,
+    Failed(RoleAssignment),
+}
+
+#[allow(clippy::manual_assert, clippy::panic)]
+#[derive(Clone, ValueEnum, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ListFilter {
     AtScope,
     AsTarget,
+}
+
+impl Display for ListFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::AtScope => write!(f, "at-scope"),
+            Self::AsTarget => write!(f, "as-target"),
+        }
+    }
 }
 
 impl ListFilter {
@@ -56,12 +75,6 @@ impl ListFilter {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-pub enum ActivationResult {
-    Success,
-    Failed(RoleAssignment),
-}
-
 pub struct PimClient {
     backend: Backend,
 }
@@ -70,6 +83,10 @@ impl PimClient {
     pub fn new() -> Result<Self> {
         let backend = Backend::new();
         Ok(Self { backend })
+    }
+
+    pub fn current_user(&self) -> Result<String> {
+        self.backend.principal_id()
     }
 
     fn thread_builder(concurrency: usize) {
@@ -93,6 +110,7 @@ impl PimClient {
         scope: Option<Scope>,
         filter: Option<ListFilter>,
     ) -> Result<RoleAssignments> {
+        let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
         info!("listing eligible assignments");
         let mut builder = self
             .backend
@@ -109,7 +127,29 @@ impl PimClient {
         let response = builder
             .send()
             .context("unable to list eligible assignments")?;
-        RoleAssignments::parse(&response, false).context("unable to parse eligible assignments")
+        let mut results = RoleAssignments::parse(&response, with_principal)
+            .context("unable to parse eligible assignments")?
+            .0;
+
+        if with_principal {
+            let ids = results
+                .iter()
+                .filter_map(|x| x.principal_id.as_deref())
+                .collect::<BTreeSet<_>>();
+
+            let objects = get_objects_by_ids(self, ids).context("getting objects by id")?;
+            results = results
+                .into_iter()
+                .map(|mut x| {
+                    if let Some(principal_id) = x.principal_id.as_ref() {
+                        x.object = objects.get(principal_id).cloned();
+                    }
+                    x
+                })
+                .collect();
+        }
+
+        Ok(RoleAssignments(results))
     }
 
     /// List the roles active role assignments for the current user
@@ -118,6 +158,8 @@ impl PimClient {
         scope: Option<Scope>,
         filter: Option<ListFilter>,
     ) -> Result<RoleAssignments> {
+        let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
+
         info!("listing active assignments");
         let mut builder = self
             .backend
@@ -134,7 +176,28 @@ impl PimClient {
         let response = builder
             .send()
             .context("unable to list active assignments")?;
-        RoleAssignments::parse(&response, false).context("unable to parse active assignments")
+        let mut results = RoleAssignments::parse(&response, with_principal)
+            .context("unable to parse active assignments")?
+            .0;
+
+        if with_principal {
+            let ids = results
+                .iter()
+                .filter_map(|x| x.principal_id.as_deref())
+                .collect::<BTreeSet<_>>();
+
+            let objects = get_objects_by_ids(self, ids).context("getting objects by id")?;
+            results = results
+                .into_iter()
+                .map(|mut x| {
+                    if let Some(principal_id) = x.principal_id.as_ref() {
+                        x.object = objects.get(principal_id).cloned();
+                    }
+                    x
+                })
+                .collect();
+        }
+        Ok(RoleAssignments(results))
     }
 
     /// Request extending the specified role eligibility
