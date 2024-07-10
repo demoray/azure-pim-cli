@@ -40,11 +40,37 @@ Options:
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
 
+      --filter <FILTER>
+          Filter to apply on the operation
+
+          Specifying `as-target` will return results for the current user.
+
+          Specifying `at-scope` will return results at or above the specified scope.
+
+          [default: as-target]
+          [possible values: at-scope, as-target]
+
       --quiet
           Only show errors
 
+      --subscription <SUBSCRIPTION>
+          Filter at the Subscription level
+
+      --resource-group <RESOURCE_GROUP>
+          List at the Resource Group level
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          List at the Provider level
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          List at a specified scope level
+
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
 ```
 ### Example Usage

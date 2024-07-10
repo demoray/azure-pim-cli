@@ -27,6 +27,7 @@ pub(crate) enum Operation {
     RoleDefinitions,
     RoleEligibilityScheduleInstances,
     RoleAssignmentScheduleRequests,
+    EligibleChildResources,
 }
 
 impl Operation {
@@ -37,6 +38,7 @@ impl Operation {
             Self::RoleDefinitions => "roleDefinitions",
             Self::RoleEligibilityScheduleInstances => "roleEligibilityScheduleInstances",
             Self::RoleAssignmentScheduleRequests => "roleAssignmentScheduleRequests",
+            Self::EligibleChildResources => "eligibleChildResources",
         }
     }
 
@@ -46,7 +48,8 @@ impl Operation {
             | Self::RoleAssignmentScheduleInstances
             | Self::RoleDefinitions
             | Self::RoleEligibilityScheduleInstances
-            | Self::RoleAssignmentScheduleRequests => TokenScope::Management,
+            | Self::RoleAssignmentScheduleRequests
+            | Self::EligibleChildResources => TokenScope::Management,
         }
     }
 
@@ -55,7 +58,8 @@ impl Operation {
             Self::RoleAssignments | Self::RoleDefinitions => "2022-04-01",
             Self::RoleAssignmentScheduleInstances
             | Self::RoleEligibilityScheduleInstances
-            | Self::RoleAssignmentScheduleRequests => "2020-10-01",
+            | Self::RoleAssignmentScheduleRequests
+            | Self::EligibleChildResources => "2020-10-01",
         }
     }
 }

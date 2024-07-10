@@ -94,9 +94,37 @@ impl Cmd {
 enum SubCommand {
     /// List active or eligible assignments
     List {
-        #[clap(long)]
         /// List active assignments
+        #[clap(long)]
         active: bool,
+
+        /// Filter to apply on the operation
+        ///
+        /// Specifying `as-target` will return results for the current user.
+        ///
+        /// Specifying `at-scope` will return results at or above the specified scope.
+        #[clap(long, default_value_t = ListFilter::AsTarget)]
+        filter: ListFilter,
+
+        /// Filter at the Subscription level
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// List at the Resource Group level
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// List at the Provider level
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
+        /// List at a specified scope level
+        #[arg(long, conflicts_with = "subscription")]
+        scope: Option<Scope>,
     },
 
     /// Activate roles
@@ -774,12 +802,21 @@ fn main() -> Result<()> {
     }
 
     match args.command {
-        SubCommand::List { active } => {
+        SubCommand::List {
+            active,
+            subscription,
+            resource_group,
+            provider,
+            scope,
+            filter,
+        } => {
+            let scope = build_scope(subscription, resource_group, scope, provider)?;
+
             let client = PimClient::new()?;
             let roles = if active {
-                client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?
+                client.list_active_role_assignments(scope, Some(filter))?
             } else {
-                client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?
+                client.list_eligible_role_assignments(scope, Some(filter))?
             };
             output(&roles)
         }
