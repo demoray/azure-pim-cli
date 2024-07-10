@@ -17,6 +17,7 @@ mod graph;
 pub mod interactive;
 mod latest;
 pub mod roles;
+pub mod scope;
 
 pub use crate::latest::check_latest_version;
 use crate::{
@@ -25,7 +26,8 @@ use crate::{
     backend::Backend,
     definitions::{Definition, Definitions},
     graph::get_objects_by_ids,
-    roles::{RoleAssignment, RoleAssignments, Scope},
+    roles::{RoleAssignment, RoleAssignments},
+    scope::Scope,
 };
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;

@@ -1,6 +1,6 @@
 use crate::{
     az_cli::{extract_oid, get_token, TokenScope},
-    roles::Scope,
+    scope::Scope,
 };
 use anyhow::{anyhow, Context, Result};
 use derive_setters::Setters;

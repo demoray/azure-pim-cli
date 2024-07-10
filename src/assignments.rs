@@ -1,4 +1,4 @@
-use crate::{graph::Object, roles::Scope};
+use crate::{graph::Object, scope::Scope};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Serialize)]
