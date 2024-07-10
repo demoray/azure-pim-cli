@@ -41,6 +41,7 @@ use uuid::Uuid;
 
 const WAIT_DELAY: Duration = Duration::from_secs(5);
 
+#[allow(clippy::large_enum_variant)]
 pub enum ActivationResult {
     Success,
     Failed(RoleAssignment),
@@ -80,7 +81,7 @@ impl PimClient {
             .query(&[("$filter", "asTarget()")])
             .send()
             .context("unable to list eligible assignments")?;
-        RoleAssignments::parse(&response).context("unable to parse eligible assignments")
+        RoleAssignments::parse(&response, false).context("unable to parse eligible assignments")
     }
 
     /// List the roles active role assignments for the current user
@@ -92,7 +93,7 @@ impl PimClient {
             .query(&[("$filter", "asTarget()")])
             .send()
             .context("unable to list active assignments")?;
-        RoleAssignments::parse(&response).context("unable to parse active assignments")
+        RoleAssignments::parse(&response, false).context("unable to parse active assignments")
     }
 
     /// Request extending the specified role eligibility
@@ -110,6 +111,9 @@ impl PimClient {
             role_definition_id,
             role,
             scope_name,
+            principal_id: _,
+            principal_type: _,
+            object: _,
         } = assignment;
         info!("extending {role} in {scope_name} ({scope})");
         let request_id = Uuid::now_v7();
@@ -153,6 +157,9 @@ impl PimClient {
             role_definition_id,
             role,
             scope_name,
+            principal_id: _,
+            principal_type: _,
+            object: _,
         } = assignment;
         info!("activating {role} in {scope_name} ({scope})");
         let request_id = Uuid::now_v7();
@@ -242,6 +249,9 @@ impl PimClient {
             role_definition_id,
             role,
             scope_name,
+            principal_id: _,
+            principal_type: _,
+            object: _,
         } = assignment;
         info!("deactivating {role} in {scope_name} ({scope})");
         let request_id = Uuid::now_v7();

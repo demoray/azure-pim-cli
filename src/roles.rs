@@ -1,3 +1,4 @@
+use crate::graph::Object;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -139,7 +140,7 @@ impl RoleAssignments {
     // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
     // that allows further nested nulls
     #[allow(clippy::indexing_slicing)]
-    pub(crate) fn parse(body: &Value) -> Result<Self> {
+    pub(crate) fn parse(body: &Value, with_principal: bool) -> Result<Self> {
         let Some(values) = body["value"].as_array() else {
             bail!("unable to parse response: missing value array: {body:#?}");
         };
@@ -176,11 +177,27 @@ impl RoleAssignments {
                 bail!("no role definition id: {entry:#?}");
             };
 
+            let (principal_id, principal_type) = if with_principal {
+                let principal_id = entry["properties"]["principalId"]
+                    .as_str()
+                    .map(ToString::to_string);
+
+                let principal_type = entry["properties"]["principalType"]
+                    .as_str()
+                    .map(ToString::to_string);
+                (principal_id, principal_type)
+            } else {
+                (None, None)
+            };
+
             results.insert(RoleAssignment {
                 role,
                 scope,
                 scope_name,
                 role_definition_id,
+                principal_id,
+                principal_type,
+                object: None,
             });
         }
 
@@ -195,6 +212,12 @@ pub struct RoleAssignment {
     pub scope_name: String,
     #[serde(skip)]
     pub role_definition_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub principal_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub principal_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<Object>,
 }
 
 impl RoleAssignment {
@@ -216,7 +239,9 @@ mod tests {
     #[test]
     fn parse_active() -> Result<()> {
         const ASSIGNMENTS: &str = include_str!("../tests/data/role-assignments.json");
-        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?)?;
+        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?, false)?;
+        assert_json_snapshot!(&assignments);
+        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?, true)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }
