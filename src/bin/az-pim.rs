@@ -539,7 +539,8 @@ impl AssignmentSubCommand {
                 provider,
             } => {
                 let client = PimClient::new()?;
-                let scope = build_scope(subscription, resource_group, scope, provider)?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?
+                    .context("valid scope must be provided")?;
                 let objects = client
                     .list_assignments(&scope)
                     .context("unable to list active assignments")?;
@@ -553,7 +554,8 @@ impl AssignmentSubCommand {
                 provider,
             } => {
                 let client = PimClient::new()?;
-                let scope = build_scope(subscription, resource_group, scope, provider)?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?
+                    .context("valid scope must be provided")?;
                 client
                     .delete_assignment(&scope, &assignment_name)
                     .context("unable to delete assignment")?;
@@ -577,7 +579,8 @@ impl AssignmentSubCommand {
                 yes,
             } => {
                 let client = PimClient::new()?;
-                let scope = build_scope(subscription, resource_group, scope, provider)?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?
+                    .context("valid scope must be provided")?;
                 let mut objects = client
                     .list_assignments(&scope)
                     .context("unable to list active assignments")?;
@@ -646,7 +649,8 @@ impl DefinitionSubCommand {
                 provider,
             } => {
                 let client = PimClient::new()?;
-                let scope = build_scope(subscription, resource_group, scope, provider)?;
+                let scope = build_scope(subscription, resource_group, scope, provider)?
+                    .context("valid scope must be provided")?;
                 output(&client.role_definitions(&scope)?)?;
             }
         }
@@ -799,16 +803,17 @@ fn build_scope(
     resource_group: Option<String>,
     scope: Option<Scope>,
     provider: Option<String>,
-) -> Result<Scope> {
+) -> Result<Option<Scope>> {
     match (subscription, resource_group, provider, scope) {
         (Some(subscription), Some(group), Some(provider), None) => {
-            Ok(Scope::from_provider(&subscription, &group, &provider))
+            Ok(Some(Scope::from_provider(&subscription, &group, &provider)))
         }
         (Some(subscription), Some(group), None, None) => {
-            Ok(Scope::from_resource_group(&subscription, &group))
+            Ok(Some(Scope::from_resource_group(&subscription, &group)))
         }
-        (Some(subscription), None, None, None) => Ok(Scope::from_subscription(&subscription)),
-        (None, None, None, Some(scope)) => Ok(scope),
+        (Some(subscription), None, None, None) => Ok(Some(Scope::from_subscription(&subscription))),
+        (None, None, None, Some(scope)) => Ok(Some(scope)),
+        (None, None, None, None) => Ok(None),
         _ => {
             bail!("invalid scope");
         }
