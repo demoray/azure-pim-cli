@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use azure_pim_cli::{roles::RoleAssignments, PimClient};
+use azure_pim_cli::{roles::RoleAssignments, ListFilter, PimClient};
 use clap::Parser;
 use std::{
     io::{stderr, stdin},
@@ -46,8 +46,8 @@ fn main() -> Result<()> {
     let Args { yes } = Args::parse();
 
     let client = PimClient::new()?;
-    let active = client.list_active_role_assignments()?;
-    let mut total = client.list_eligible_role_assignments()?;
+    let active = client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
+    let mut total = client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
     total.0.extend(active.0.clone());
 
     for role_assignment in total.0 {

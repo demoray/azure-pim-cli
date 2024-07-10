@@ -4,7 +4,7 @@ use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
     roles::{Role, RoleAssignments, Scope},
-    PimClient,
+    ListFilter, PimClient,
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Shell};
@@ -250,7 +250,7 @@ impl ActivateSubCommand {
             } => {
                 let client = PimClient::new()?;
                 let roles = client
-                    .list_eligible_role_assignments()
+                    .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list eligible assignments")?;
                 let entry = roles
                     .find(&role, &scope)
@@ -292,7 +292,8 @@ impl ActivateSubCommand {
                 wait,
             } => {
                 let client = PimClient::new()?;
-                let roles = client.list_eligible_role_assignments()?;
+                let roles =
+                    client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
                 if let Some(Selected {
                     assignments,
                     justification,
@@ -385,7 +386,7 @@ impl DeactivateSubCommand {
             Self::Role { role, scope } => {
                 let client = PimClient::new()?;
                 let roles = client
-                    .list_active_role_assignments()
+                    .list_active_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list active assignments")?;
                 let entry = roles.find(&role, &scope).context("role not found")?;
                 client.deactivate_role_assignment(entry)?;
@@ -401,7 +402,8 @@ impl DeactivateSubCommand {
             }
             Self::Interactive { concurrency } => {
                 let client = PimClient::new()?;
-                let roles = client.list_active_role_assignments()?;
+                let roles =
+                    client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
                 if let Some(Selected { assignments, .. }) = interactive_ui(roles, None, None)? {
                     client.deactivate_role_assignment_set(&assignments, concurrency)?;
                 }
@@ -775,9 +777,9 @@ fn main() -> Result<()> {
         SubCommand::List { active } => {
             let client = PimClient::new()?;
             let roles = if active {
-                client.list_active_role_assignments()?
+                client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?
             } else {
-                client.list_eligible_role_assignments()?
+                client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?
             };
             output(&roles)
         }
@@ -839,11 +841,11 @@ fn build_set(
 
     let assignments = if active {
         client
-            .list_active_role_assignments()
+            .list_active_role_assignments(None, Some(ListFilter::AsTarget))
             .context("unable to list active assignments in PIM")?
     } else {
         client
-            .list_eligible_role_assignments()
+            .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
             .context("unable to list available assignments in PIM")?
     };
 

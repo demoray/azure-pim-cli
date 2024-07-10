@@ -41,6 +41,21 @@ use uuid::Uuid;
 
 const WAIT_DELAY: Duration = Duration::from_secs(5);
 
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ListFilter {
+    AtScope,
+    AsTarget,
+}
+
+impl ListFilter {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::AtScope => "atScope()",
+            Self::AsTarget => "asTarget()",
+        }
+    }
+}
+
 #[allow(clippy::large_enum_variant)]
 pub enum ActivationResult {
     Success,
@@ -73,24 +88,50 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn list_eligible_role_assignments(&self) -> Result<RoleAssignments> {
+    pub fn list_eligible_role_assignments(
+        &self,
+        scope: Option<Scope>,
+        filter: Option<ListFilter>,
+    ) -> Result<RoleAssignments> {
         info!("listing eligible assignments");
-        let response = self
+        let mut builder = self
             .backend
-            .request(Method::GET, Operation::RoleEligibilityScheduleInstances)
-            .query("$filter", "asTarget()")
+            .request(Method::GET, Operation::RoleEligibilityScheduleInstances);
+
+        if let Some(scope) = scope {
+            builder = builder.scope(scope);
+        }
+
+        if let Some(filter) = filter {
+            builder = builder.query("$filter", filter.as_str());
+        }
+
+        let response = builder
             .send()
             .context("unable to list eligible assignments")?;
         RoleAssignments::parse(&response, false).context("unable to parse eligible assignments")
     }
 
     /// List the roles active role assignments for the current user
-    pub fn list_active_role_assignments(&self) -> Result<RoleAssignments> {
+    pub fn list_active_role_assignments(
+        &self,
+        scope: Option<Scope>,
+        filter: Option<ListFilter>,
+    ) -> Result<RoleAssignments> {
         info!("listing active assignments");
-        let response = self
+        let mut builder = self
             .backend
-            .request(Method::GET, Operation::RoleAssignmentScheduleInstances)
-            .query("$filter", "asTarget()")
+            .request(Method::GET, Operation::RoleAssignmentScheduleInstances);
+
+        if let Some(scope) = scope {
+            builder = builder.scope(scope);
+        }
+
+        if let Some(filter) = filter {
+            builder = builder.query("$filter", filter.as_str());
+        }
+
+        let response = builder
             .send()
             .context("unable to list active assignments")?;
         RoleAssignments::parse(&response, false).context("unable to parse active assignments")
@@ -353,7 +394,7 @@ impl PimClient {
             }
             last = Some(current);
 
-            let active = self.list_active_role_assignments()?;
+            let active = self.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
             debug!("active assignments: {active:#?}");
             waiting.retain(|entry| !active.contains(entry));
             debug!("still waiting: {waiting:#?}");
