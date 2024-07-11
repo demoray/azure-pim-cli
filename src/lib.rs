@@ -115,7 +115,11 @@ impl PimClient {
         filter: Option<ListFilter>,
     ) -> Result<RoleAssignments> {
         let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
-        info!("listing eligible assignments");
+        if let Some(scope) = &scope {
+            info!("listing eligible assignments for {scope}");
+        } else {
+            info!("listing eligible assignments");
+        }
         let mut builder = self
             .backend
             .request(Method::GET, Operation::RoleEligibilityScheduleInstances);
@@ -164,7 +168,12 @@ impl PimClient {
     ) -> Result<RoleAssignments> {
         let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
 
-        info!("listing active assignments");
+        if let Some(scope) = &scope {
+            info!("listing active role assignments in {scope}");
+        } else {
+            info!("listing active role assignments");
+        }
+
         let mut builder = self
             .backend
             .request(Method::GET, Operation::RoleAssignmentScheduleInstances);
