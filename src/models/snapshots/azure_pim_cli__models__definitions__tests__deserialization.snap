@@ -1,5 +1,5 @@
 ---
-source: src/definitions.rs
+source: src/models/definitions.rs
 expression: definitions
 ---
 {

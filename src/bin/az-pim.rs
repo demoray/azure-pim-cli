@@ -1,10 +1,12 @@
 use anyhow::{bail, Context, Result};
 use azure_pim_cli::{
-    assignments::Assignment,
     check_latest_version,
     interactive::{interactive_ui, Selected},
-    roles::{Role, RoleAssignments},
-    scope::Scope,
+    models::{
+        assignments::Assignment,
+        roles::{Role, RoleAssignments},
+        scope::Scope,
+    },
     ListFilter, PimClient,
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
@@ -576,7 +578,7 @@ impl AssignmentSubCommand {
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 let objects = client
-                    .list_assignments(&scope)
+                    .role_assignments(&scope)
                     .context("unable to list active assignments")?;
                 output(&objects)?;
             }
@@ -590,7 +592,7 @@ impl AssignmentSubCommand {
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 client
-                    .delete_assignment(&scope, &assignment_name)
+                    .delete_role_assignment(&scope, &assignment_name)
                     .context("unable to delete assignment")?;
             }
             Self::DeleteSet { config } => {
@@ -599,7 +601,7 @@ impl AssignmentSubCommand {
                     .context("unable to parse config file")?;
                 for entry in entries {
                     client
-                        .delete_assignment(&entry.properties.scope, &entry.name)
+                        .delete_role_assignment(&entry.properties.scope, &entry.name)
                         .context("unable to delete assignment")?;
                 }
             }
@@ -613,7 +615,7 @@ impl AssignmentSubCommand {
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 let mut objects = client
-                    .list_assignments(&scope)
+                    .role_assignments(&scope)
                     .context("unable to list active assignments")?;
                 let definitions = client.role_definitions(&scope)?;
                 debug!("{} total entries", objects.len());
@@ -636,7 +638,7 @@ impl AssignmentSubCommand {
                     }
 
                     client
-                        .delete_assignment(&entry.properties.scope, &entry.name)
+                        .delete_role_assignment(&entry.properties.scope, &entry.name)
                         .context("unable to delete assignment")?;
                 }
             }

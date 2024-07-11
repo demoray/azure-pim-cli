@@ -1,4 +1,4 @@
-use crate::{graph::Object, scope::Scope};
+use crate::{graph::Object, models::scope::Scope};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn test_deserialization() -> Result<()> {
-        const DATA: &str = include_str!("../tests/data/assignments.json");
+        const DATA: &str = include_str!("../../tests/data/assignments.json");
         let data: Assignments = serde_json::from_str(DATA)?;
         assert_json_snapshot!(data);
         Ok(())

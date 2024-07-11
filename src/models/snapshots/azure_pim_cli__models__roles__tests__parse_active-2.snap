@@ -1,5 +1,5 @@
 ---
-source: src/roles.rs
+source: src/models/roles.rs
 expression: "&assignments"
 ---
 [

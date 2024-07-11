@@ -9,27 +9,25 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod activate;
-pub mod assignments;
 mod az_cli;
 mod backend;
-mod definitions;
 mod graph;
 pub mod interactive;
 mod latest;
-pub mod resources;
-pub mod roles;
-pub mod scope;
+pub mod models;
 
 pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
-    assignments::{Assignment, Assignments},
     backend::Backend,
-    definitions::{Definition, Definitions},
     graph::get_objects_by_ids,
-    resources::ChildResource,
-    roles::{RoleAssignment, RoleAssignments},
-    scope::Scope,
+    models::{
+        assignments::{Assignment, Assignments},
+        definitions::{Definition, Definitions},
+        resources::ChildResource,
+        roles::{RoleAssignment, RoleAssignments},
+        scope::Scope,
+    },
 };
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;
@@ -161,6 +159,9 @@ impl PimClient {
     }
 
     /// List the roles active role assignments for the current user
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn list_active_role_assignments(
         &self,
         scope: Option<Scope>,
@@ -486,8 +487,11 @@ impl PimClient {
         Ok(())
     }
 
-    /// List all assignments (not just those managed by PIM)
-    pub fn list_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
+    /// List role assignments
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
+    pub fn role_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
         info!("listing assignments for {scope}");
         let value = self
             .backend
@@ -509,6 +513,10 @@ impl PimClient {
         Ok(assignments)
     }
 
+    /// List eligible child resources for the specified scope
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn eligible_child_resources(&self, scope: &Scope) -> Result<BTreeSet<ChildResource>> {
         info!("listing eligible child resources for {scope}");
         let value = self
@@ -521,6 +529,9 @@ impl PimClient {
     }
 
     /// List all assignments (not just those managed by PIM)
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn role_definitions(&self, scope: &Scope) -> Result<Vec<Definition>> {
         info!("listing role definitions for {scope}");
         let definitions = self
@@ -533,7 +544,11 @@ impl PimClient {
         Ok(definitions.value)
     }
 
-    pub fn delete_assignment(&self, scope: &Scope, assignment_name: &str) -> Result<()> {
+    /// Delete a role assignment
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
+    pub fn delete_role_assignment(&self, scope: &Scope, assignment_name: &str) -> Result<()> {
         info!("deleting assignment {assignment_name} from {scope}");
         self.backend
             .request(Method::DELETE, Operation::RoleAssignments)
@@ -544,11 +559,13 @@ impl PimClient {
         Ok(())
     }
 
-    /// Delete the specified role assignment
+    /// Delete eligibile role assignment
+    ///
+    /// This removes role assignments that are available via PIM.
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn delete_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
+    pub fn delete_eligible_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
         let RoleAssignment {
             scope,
             role_definition_id,

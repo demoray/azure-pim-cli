@@ -1,9 +1,8 @@
+use crate::models::scope::Scope;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
-
-use crate::scope::Scope;
 
 #[derive(Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub struct ChildResource {
@@ -39,7 +38,7 @@ mod tests {
 
     #[test]
     fn test_child_resource_parse() -> Result<()> {
-        let data: Value = from_str(include_str!("../tests/data/child-resources.json"))?;
+        let data: Value = from_str(include_str!("../../tests/data/child-resources.json"))?;
         let result = ChildResource::parse(&data)?;
         assert_json_snapshot!(result);
         Ok(())

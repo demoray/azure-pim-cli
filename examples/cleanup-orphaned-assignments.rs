@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use azure_pim_cli::{roles::RoleAssignments, ListFilter, PimClient};
+use azure_pim_cli::{models::roles::RoleAssignments, ListFilter, PimClient};
 use clap::Parser;
 use std::{
     io::{stderr, stdin},
@@ -74,7 +74,7 @@ fn main() -> Result<()> {
         }
 
         let mut objects = client
-            .list_assignments(&role_assignment.scope)
+            .role_assignments(&role_assignment.scope)
             .context("unable to list active assignments")?;
         let definitions = client.role_definitions(&role_assignment.scope)?;
         debug!("{} total entries", objects.len());
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
             }
 
             client
-                .delete_assignment(&entry.properties.scope, &entry.name)
+                .delete_role_assignment(&entry.properties.scope, &entry.name)
                 .context("unable to delete assignment")?;
         }
     }

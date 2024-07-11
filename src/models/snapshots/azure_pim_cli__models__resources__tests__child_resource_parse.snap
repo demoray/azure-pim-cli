@@ -1,5 +1,5 @@
 ---
-source: src/resources.rs
+source: src/models/resources.rs
 expression: result
 ---
 [
