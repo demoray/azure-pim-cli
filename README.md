@@ -425,6 +425,7 @@ Usage: role [OPTIONS] <COMMAND>
 Commands:
   assignment  Manage role assignments
   definition  Manage role definitions
+  resources   Commands related to resources in Azure
 
 Options:
       --verbose...

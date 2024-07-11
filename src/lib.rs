@@ -16,6 +16,7 @@ mod definitions;
 mod graph;
 pub mod interactive;
 mod latest;
+pub mod resources;
 pub mod roles;
 pub mod scope;
 
@@ -26,6 +27,7 @@ use crate::{
     backend::Backend,
     definitions::{Definition, Definitions},
     graph::get_objects_by_ids,
+    resources::ChildResource,
     roles::{RoleAssignment, RoleAssignments},
     scope::Scope,
 };
@@ -496,6 +498,17 @@ impl PimClient {
             x.object = objects.get(&x.properties.principal_id).cloned();
         }
         Ok(assignments)
+    }
+
+    pub fn eligible_child_resources(&self, scope: &Scope) -> Result<BTreeSet<ChildResource>> {
+        info!("listing eligible child resources for {scope}");
+        let value = self
+            .backend
+            .request(Method::GET, Operation::EligibleChildResources)
+            .scope(scope.clone())
+            .send()
+            .context("unable to list eligible child resources")?;
+        ChildResource::parse(&value)
     }
 
     /// List all assignments (not just those managed by PIM)
