@@ -1,0 +1,14 @@
+{
+  "value": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group",
+      "name": "DefaultResourceGroup-EUS",
+      "type": "resourcegroup"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/my-resource-group2",
+      "name": "DefaultResourceGroup-EUS",
+      "type": "resourcegroup"
+    }
+  ]
+}
