@@ -7,8 +7,9 @@ Usage: az-pim [OPTIONS] <COMMAND>
 
 Commands:
   list        List active or eligible assignments
-  activate    Activate roles
-  deactivate  Deactivate roles
+  activate    Activate eligible role assignments
+  deactivate  Deactivate eligible role assignments
+  delete      Delete eligible role assignments
   role        Manage Azure role-based access control (Azure RBAC)
   init        Setup shell tab completions
 
@@ -103,7 +104,7 @@ $
 ## az-pim activate
 
 ```
-Activate roles
+Activate eligible role assignments
 
 Usage: activate [OPTIONS] <COMMAND>
 
@@ -291,7 +292,7 @@ Options:
 ## az-pim deactivate
 
 ```
-Deactivate roles
+Deactivate eligible role assignments
 
 Usage: deactivate [OPTIONS] <COMMAND>
 
@@ -415,6 +416,67 @@ Options:
           Print help (see a summary with '-h')
 
 ```
+## az-pim delete
+
+```
+Delete eligible role assignments
+
+Usage: delete [OPTIONS] <COMMAND>
+
+Commands:
+  orphaned-entries  Delete assignments that objects in Microsoft Graph cannot be found
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+### az-pim delete orphaned-entries
+
+```
+Delete assignments that objects in Microsoft Graph cannot be found
+
+Usage: orphaned-entries [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Subscription
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Resource Group
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Provider
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify scope directly
+
+      --nested
+          Delete nested assignments
+
+      --yes
+          Always respond yes to confirmations
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
 ## az-pim role
 
 ```
@@ -446,10 +508,10 @@ Manage role assignments
 Usage: assignment [OPTIONS] <COMMAND>
 
 Commands:
-  list                   List assignments
-  delete                 Delete an assignment
-  delete-set             Delete a set of assignments
-  delete-orphan-entries  Delete assignments that objects in Microsoft Graph cannot be found
+  list                     List assignments
+  delete                   Delete an assignment
+  delete-set               Delete a set of assignments
+  delete-orphaned-entries  Delete assignments that objects in Microsoft Graph cannot be found
 
 Options:
       --verbose...
@@ -597,12 +659,12 @@ $ az-pim role assignment list --subscription 00000000-0000-0000-0000-00000000000
 $
 ```
 
-#### az-pim role assignment delete-orphan-entries
+#### az-pim role assignment delete-orphaned-entries
 
 ```
 Delete assignments that objects in Microsoft Graph cannot be found
 
-Usage: delete-orphan-entries [OPTIONS]
+Usage: delete-orphaned-entries [OPTIONS]
 
 Options:
       --subscription <SUBSCRIPTION>
@@ -627,6 +689,9 @@ Options:
       --scope <SCOPE>
           Specify scope directly
 
+      --nested
+          Delete nested assignments
+
       --yes
           Always respond yes to confirmations
 
@@ -637,7 +702,7 @@ Options:
 ##### Example Usage
 
 ```
-$ az-pim role assignment delete-orphan-entries --subscription 00000000-0000-0000-0000-000000000001
+$ az-pim role assignment delete-orphaned-entries --subscription 00000000-0000-0000-0000-000000000001
 2024-07-09T19:54:45.843289Z  INFO azure_pim_cli: listing assignments
 2024-07-09T19:54:48.142932Z  INFO azure_pim_cli: listing role definitions
 2024-07-09T19:54:48.421671Z  INFO az_pim: Are you sure you want to delete role: "Storage Queue Data Contributor" principal:00000000-0000-0000-0000-000000000000 (type: ServicePrincipal) scope:/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount? (y/n):

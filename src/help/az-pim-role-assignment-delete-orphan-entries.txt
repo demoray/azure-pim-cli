@@ -1,4 +1,4 @@
-$ az-pim role assignment delete-orphan-entries --subscription 00000000-0000-0000-0000-000000000001
+$ az-pim role assignment delete-orphaned-entries --subscription 00000000-0000-0000-0000-000000000001
 2024-07-09T19:54:45.843289Z  INFO azure_pim_cli: listing assignments
 2024-07-09T19:54:48.142932Z  INFO azure_pim_cli: listing role definitions
 2024-07-09T19:54:48.421671Z  INFO az_pim: Are you sure you want to delete role: "Storage Queue Data Contributor" principal:00000000-0000-0000-0000-000000000000 (type: ServicePrincipal) scope:/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount? (y/n):

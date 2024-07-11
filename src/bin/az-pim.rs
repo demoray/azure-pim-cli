@@ -18,12 +18,12 @@ use std::{
     collections::BTreeSet,
     error::Error,
     fs::{read, File},
-    io::{stderr, stdin, stdout},
+    io::{stderr, stdout},
     path::PathBuf,
     str::FromStr,
     time::Duration,
 };
-use tracing::{debug, info, warn};
+use tracing::debug;
 use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
@@ -57,6 +57,11 @@ impl Cmd {
             | "az-pim activate"
             | "az-pim activate interactive"
             | "az-pim deactivate"
+            | "az-pim delete"
+            | "az-pim delete role <ROLE> <SCOPE>"
+            | "az-pim delete set"
+            | "az-pim delete interactive"
+            | "az-pim delete orphaned-entries"
             | "az-pim deactivate interactive"
             | "az-pim role"
             | "az-pim role assignment"
@@ -83,7 +88,7 @@ impl Cmd {
             "az-pim role assignment delete-set <CONFIG>" => Some(include_str!(
                 "../help/az-pim-role-assignment-delete-set.txt"
             )),
-            "az-pim role assignment delete-orphan-entries" => Some(include_str!(
+            "az-pim role assignment delete-orphaned-entries" => Some(include_str!(
                 "../help/az-pim-role-assignment-delete-orphan-entries.txt"
             )),
             "az-pim role definition list" => {
@@ -134,16 +139,22 @@ enum SubCommand {
         scope: Option<Scope>,
     },
 
-    /// Activate roles
+    /// Activate eligible role assignments
     Activate {
         #[clap(subcommand)]
         cmd: ActivateSubCommand,
     },
 
-    /// Deactivate roles
+    /// Deactivate eligible role assignments
     Deactivate {
         #[clap(subcommand)]
         cmd: DeactivateSubCommand,
+    },
+
+    /// Delete eligible role assignments
+    Delete {
+        #[clap(subcommand)]
+        cmd: DeleteEligibleSubCommand,
     },
 
     /// Manage Azure role-based access control (Azure RBAC).
@@ -443,6 +454,60 @@ impl DeactivateSubCommand {
 }
 
 #[derive(Subcommand)]
+enum DeleteEligibleSubCommand {
+    /// Delete assignments that objects in Microsoft Graph cannot be found
+    OrphanedEntries {
+        /// Subscription
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// Resource Group
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// Provider
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
+        /// Specify scope directly
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
+        scope: Option<Scope>,
+
+        /// Delete nested assignments
+        #[arg(long)]
+        nested: bool,
+
+        /// Always respond yes to confirmations
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+impl DeleteEligibleSubCommand {
+    fn run(self, client: &PimClient) -> Result<()> {
+        match self {
+            Self::OrphanedEntries {
+                subscription,
+                resource_group,
+                provider,
+                scope,
+                nested,
+                yes,
+            } => {
+                let scope = build_scope(subscription, resource_group, scope, provider)?
+                    .context("valid scope must be provided")?;
+                client.delete_orphaned_eligible_role_assignments(&scope, yes, nested)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Subcommand)]
 enum RoleSubCommand {
     /// Manage role assignments
     Assignment {
@@ -522,7 +587,7 @@ enum AssignmentSubCommand {
     },
 
     /// Delete assignments that objects in Microsoft Graph cannot be found
-    DeleteOrphanEntries {
+    DeleteOrphanedEntries {
         /// Subscription
         #[arg(long)]
         subscription: Option<Uuid>,
@@ -543,27 +608,14 @@ enum AssignmentSubCommand {
         #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
         scope: Option<Scope>,
 
+        /// Delete nested assignments
+        #[arg(long)]
+        nested: bool,
+
         /// Always respond yes to confirmations
         #[arg(long)]
         yes: bool,
     },
-}
-
-fn choice(msg: &str) -> bool {
-    info!("Are you sure you want to {msg}? (y/n): ");
-    loop {
-        let mut input = String::new();
-        let Ok(_) = stdin().read_line(&mut input) else {
-            continue;
-        };
-        match input.trim().to_lowercase().as_str() {
-            "y" => break true,
-            "n" => break false,
-            _ => {
-                warn!("Please enter 'y' or 'n': ");
-            }
-        }
-    }
 }
 
 impl AssignmentSubCommand {
@@ -605,42 +657,18 @@ impl AssignmentSubCommand {
                         .context("unable to delete assignment")?;
                 }
             }
-            Self::DeleteOrphanEntries {
+            Self::DeleteOrphanedEntries {
                 subscription,
                 resource_group,
                 provider,
                 scope,
                 yes,
+                nested,
             } => {
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
-                let mut objects = client
-                    .role_assignments(&scope)
-                    .context("unable to list active assignments")?;
-                let definitions = client.role_definitions(&scope)?;
-                debug!("{} total entries", objects.len());
-                objects.retain(|x| x.object.is_none());
-                debug!("{} orphaned entries", objects.len());
-                for entry in objects {
-                    let definition = definitions
-                        .iter()
-                        .find(|x| x.id == entry.properties.role_definition_id);
-                    let value = format!(
-                        "role:\"{}\" principal:{} (type: {}) scope:{}",
-                        definition.map_or(entry.name.as_str(), |x| x.properties.role_name.as_str()),
-                        entry.properties.principal_id,
-                        entry.properties.principal_type,
-                        entry.properties.scope
-                    );
-                    if !yes && !choice(&format!("delete {value}")) {
-                        info!("skipping {value}");
-                        continue;
-                    }
 
-                    client
-                        .delete_role_assignment(&entry.properties.scope, &entry.name)
-                        .context("unable to delete assignment")?;
-                }
+                client.delete_orphaned_role_assignments(&scope, yes, nested)?;
             }
         }
         Ok(())
@@ -869,6 +897,7 @@ fn main() -> Result<()> {
         }
         SubCommand::Activate { cmd } => cmd.run(&client),
         SubCommand::Deactivate { cmd } => cmd.run(&client),
+        SubCommand::Delete { cmd } => cmd.run(&client),
         SubCommand::Role { cmd } => match cmd {
             RoleSubCommand::Assignment { cmd } => cmd.run(&client),
             RoleSubCommand::Definition { cmd } => cmd.run(&client),
