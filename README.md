@@ -425,6 +425,7 @@ Usage: role [OPTIONS] <COMMAND>
 Commands:
   assignment  Manage role assignments
   definition  Manage role definitions
+  resources   Commands related to resources in Azure
 
 Options:
       --verbose...
@@ -766,6 +767,79 @@ $ az-pim role definition list --subscription 00000000-0000-0000-0000-00000000000
   }
 ]
 $
+```
+
+### az-pim role resources
+
+```
+Commands related to resources in Azure
+
+Usage: resources [OPTIONS] <COMMAND>
+
+Commands:
+  list  List the child resources of a resource which you have eligible access
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+#### az-pim role resources list
+
+```
+List the child resources of a resource which you have eligible access
+
+Usage: list [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Limit the scope by the specified Subscription
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Limit the scope by the specified Resource Group
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Provider
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify scope directly
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+##### Example Usage
+
+```
+$ az-pim role resources list --subscription 00000000-0000-0000-0000-000000000000
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/DefaultResourceGroup-EUS",
+    "name": "DefaultResourceGroup-EUS",
+    "type": "resourcegroup"
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/DefaultResourceGroup-SUK",
+    "name": "DefaultResourceGroup-SUK",
+    "type": "resourcegroup"
+  }
+]
 ```
 
 ## az-pim init <SHELL>

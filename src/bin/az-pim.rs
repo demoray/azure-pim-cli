@@ -58,7 +58,8 @@ impl Cmd {
             | "az-pim deactivate interactive"
             | "az-pim role"
             | "az-pim role assignment"
-            | "az-pim role definition" => None,
+            | "az-pim role definition"
+            | "az-pim role resources" => None,
             "az-pim list" => Some(include_str!("../help/az-pim-list.txt")),
             "az-pim activate role <ROLE> <SCOPE> <JUSTIFICATION>" => {
                 Some(include_str!("../help/az-pim-activate-role.txt"))
@@ -85,6 +86,9 @@ impl Cmd {
             )),
             "az-pim role definition list" => {
                 Some(include_str!("../help/az-pim-role-definition-list.txt"))
+            }
+            "az-pim role resources list" => {
+                Some(include_str!("../help/az-pim-role-resources-list.txt"))
             }
             unsupported => unimplemented!("unable to generate example for {unsupported}"),
         }
@@ -449,6 +453,12 @@ enum RoleSubCommand {
         #[clap(subcommand)]
         cmd: DefinitionSubCommand,
     },
+
+    /// Commands related to resources in Azure
+    Resources {
+        #[clap(subcommand)]
+        cmd: ResourcesSubCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -678,6 +688,50 @@ impl DefinitionSubCommand {
     }
 }
 
+#[derive(Subcommand)]
+enum ResourcesSubCommand {
+    /// List the child resources of a resource which you have eligible access
+    List {
+        /// Limit the scope by the specified Subscription
+        #[arg(long)]
+        subscription: Option<Uuid>,
+
+        /// Limit the scope by the specified Resource Group
+        ///
+        /// This argument requires `subscription` to be set.
+        #[arg(long, requires = "subscription")]
+        resource_group: Option<String>,
+
+        /// Provider
+        ///
+        /// This argument requires `subscription` and `resource_group` to be set.
+        #[arg(long, requires = "resource_group")]
+        provider: Option<String>,
+
+        /// Specify scope directly
+        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
+        scope: Option<Scope>,
+    },
+}
+
+impl ResourcesSubCommand {
+    fn run(self, client: &PimClient) -> Result<()> {
+        match self {
+            Self::List {
+                subscription,
+                resource_group,
+                scope,
+                provider,
+            } => {
+                let scope = build_scope(subscription, resource_group, scope, provider)?
+                    .context("valid scope must be provided")?;
+                output(&client.eligible_child_resources(&scope)?)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Parse a single key-value pair of `X=Y` into a typed tuple of `(X, Y)`.
 ///
 /// # Errors
@@ -816,6 +870,7 @@ fn main() -> Result<()> {
         SubCommand::Role { cmd } => match cmd {
             RoleSubCommand::Assignment { cmd } => cmd.run(&client),
             RoleSubCommand::Definition { cmd } => cmd.run(&client),
+            RoleSubCommand::Resources { cmd } => cmd.run(&client),
         },
         SubCommand::Readme => {
             build_readme();

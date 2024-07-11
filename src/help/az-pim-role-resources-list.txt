@@ -1,0 +1,13 @@
+$ az-pim role resources list --subscription 00000000-0000-0000-0000-000000000000
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/DefaultResourceGroup-EUS",
+    "name": "DefaultResourceGroup-EUS",
+    "type": "resourcegroup"
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/DefaultResourceGroup-SUK",
+    "name": "DefaultResourceGroup-SUK",
+    "type": "resourcegroup"
+  }
+]
