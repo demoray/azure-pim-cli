@@ -576,7 +576,7 @@ impl AssignmentSubCommand {
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 let objects = client
-                    .role_assignmets(&scope)
+                    .list_assignments(&scope)
                     .context("unable to list active assignments")?;
                 output(&objects)?;
             }
@@ -613,7 +613,7 @@ impl AssignmentSubCommand {
                 let scope = build_scope(subscription, resource_group, scope, provider)?
                     .context("valid scope must be provided")?;
                 let mut objects = client
-                    .role_assignmets(&scope)
+                    .list_assignments(&scope)
                     .context("unable to list active assignments")?;
                 let definitions = client.role_definitions(&scope)?;
                 debug!("{} total entries", objects.len());
