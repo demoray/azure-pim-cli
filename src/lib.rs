@@ -37,6 +37,7 @@ use reqwest::Method;
 use std::{
     collections::BTreeSet,
     fmt::{Display, Formatter, Result as FmtResult},
+    io::stdin,
     sync::Once,
     thread::sleep,
     time::{Duration, Instant},
@@ -601,6 +602,98 @@ impl PimClient {
             .send()?;
         Ok(())
     }
+
+    pub fn delete_orphaned_role_assignments(
+        &self,
+        scope: &Scope,
+        answer_yes: bool,
+        nested: bool,
+    ) -> Result<()> {
+        let mut scopes: BTreeSet<_> = [scope.clone()].into();
+
+        if nested {
+            let resources = self.eligible_child_resources(scope)?;
+            scopes.extend(resources.into_iter().map(|x| x.id));
+        }
+
+        for scope in scopes {
+            let definitions = self.role_definitions(&scope)?;
+
+            let mut objects = self
+                .role_assignments(&scope)
+                .context("unable to list active assignments")?;
+            debug!("{} total entries", objects.len());
+            objects.retain(|x| x.object.is_none());
+            debug!("{} orphaned entries", objects.len());
+            for entry in objects {
+                let definition = definitions
+                    .iter()
+                    .find(|x| x.id == entry.properties.role_definition_id);
+                let value = format!(
+                    "role:\"{}\" principal:{} (type: {}) scope:{}",
+                    definition.map_or(entry.name.as_str(), |x| x.properties.role_name.as_str()),
+                    entry.properties.principal_id,
+                    entry.properties.principal_type,
+                    entry.properties.scope
+                );
+                if !answer_yes && !confirm(&format!("delete {value}")) {
+                    info!("skipping {value}");
+                    continue;
+                }
+
+                self.delete_role_assignment(&entry.properties.scope, &entry.name)
+                    .context("unable to delete assignment")?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_orphaned_eligible_role_assignments(
+        &self,
+        scope: &Scope,
+        answer_yes: bool,
+        nested: bool,
+    ) -> Result<()> {
+        let mut scopes: BTreeSet<_> = [scope.clone()].into();
+
+        if nested {
+            let resources = self.eligible_child_resources(scope)?;
+            scopes.extend(resources.into_iter().map(|x| x.id));
+        }
+
+        for scope in scopes {
+            let definitions = self.role_definitions(&scope)?;
+            for entry in self.list_eligible_role_assignments(Some(scope), None)?.0 {
+                if entry.object.is_some() {
+                    continue;
+                }
+
+                let definition = definitions
+                    .iter()
+                    .find(|x| x.id == entry.role_definition_id);
+
+                let value = format!(
+                    "role:\"{}\" principal:{} (type: {}) scope:{}",
+                    definition.map_or(entry.role_definition_id.as_str(), |x| x
+                        .properties
+                        .role_name
+                        .as_str()),
+                    entry.principal_id.clone().unwrap_or_default(),
+                    entry.principal_type.clone().unwrap_or_default(),
+                    entry.scope_name.clone()
+                );
+                if !answer_yes && !confirm(&format!("delete {value}")) {
+                    info!("skipping {value}");
+                    continue;
+                }
+                info!("deleting {value}");
+
+                self.delete_eligible_role_assignment(&entry)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn format_duration(duration: Duration) -> Result<String> {
@@ -625,6 +718,23 @@ fn format_duration(duration: Duration) -> Result<String> {
 
     ensure!(!data.is_empty(), "duration must be at least 1 second");
     Ok(format!("PT{}", data.join("")))
+}
+
+pub fn confirm(msg: &str) -> bool {
+    info!("Are you sure you want to {msg}? (y/n): ");
+    loop {
+        let mut input = String::new();
+        let Ok(_) = stdin().read_line(&mut input) else {
+            continue;
+        };
+        match input.trim().to_lowercase().as_str() {
+            "y" => break true,
+            "n" => break false,
+            _ => {
+                warn!("Please enter 'y' or 'n': ");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
