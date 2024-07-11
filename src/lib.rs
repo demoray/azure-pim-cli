@@ -543,6 +543,47 @@ impl PimClient {
             .context("unable to delete assignment")?;
         Ok(())
     }
+
+    /// Delete the specified role assignment
+    ///
+    /// # Errors
+    /// Will return `Err` if the request fails or the response is not valid JSON
+    pub fn delete_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
+        let RoleAssignment {
+            scope,
+            role_definition_id,
+            role,
+            scope_name,
+            principal_id,
+            principal_type: _,
+            object: _,
+        } = assignment;
+
+        let principal_id = principal_id.as_deref().context("missing principal id")?;
+        info!("deleting {role} in {scope_name} ({scope})");
+        let request_id = Uuid::now_v7();
+        let body = serde_json::json!({
+            "properties": {
+                "principalId": principal_id,
+                "roleDefinitionId": role_definition_id,
+                "requestType": "AdminRemove",
+                "ScheduleInfo": {
+                    "Expiration": {
+                        "Type": "NoExpiration",
+                    }
+                }
+            }
+        });
+
+        self.backend
+            .request(Method::PUT, Operation::RoleEligibilityScheduleRequests)
+            .extra(format!("/{request_id}"))
+            .scope(scope.clone())
+            .json(body)
+            .validate(check_error_response)
+            .send()?;
+        Ok(())
+    }
 }
 
 fn format_duration(duration: Duration) -> Result<String> {
