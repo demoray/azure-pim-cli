@@ -545,8 +545,6 @@ impl PimClient {
             role_definition_id,
             role,
             scope_name,
-            status: _,
-            name: _,
             principal_id,
             principal_type: _,
             object: _,
