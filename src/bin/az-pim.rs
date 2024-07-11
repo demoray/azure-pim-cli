@@ -1,10 +1,12 @@
 use anyhow::{bail, Context, Result};
 use azure_pim_cli::{
-    assignments::Assignment,
     check_latest_version,
     interactive::{interactive_ui, Selected},
-    roles::{Role, RoleAssignments},
-    scope::Scope,
+    models::{
+        assignments::Assignment,
+        roles::{Role, RoleAssignments},
+        scope::Scope,
+    },
     ListFilter, PimClient,
 };
 use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand, ValueHint};

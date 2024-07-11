@@ -1,5 +1,7 @@
-use crate::graph::Object;
-use crate::scope::{Scope, ScopeError};
+use crate::{
+    graph::Object,
+    models::scope::{Scope, ScopeError},
+};
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -172,7 +174,7 @@ mod tests {
 
     #[test]
     fn parse_active() -> Result<()> {
-        const ASSIGNMENTS: &str = include_str!("../tests/data/role-assignments.json");
+        const ASSIGNMENTS: &str = include_str!("../../tests/data/role-assignments.json");
         let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?, false)?;
         assert_json_snapshot!(&assignments);
         let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?, true)?;

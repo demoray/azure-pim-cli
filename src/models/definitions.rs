@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test_deserialization() -> Result<()> {
-        const ROLES: &str = include_str!("../tests/data/definitions.json");
+        const ROLES: &str = include_str!("../../tests/data/definitions.json");
         let definitions: Definitions = serde_json::from_str(ROLES)?;
         assert_json_snapshot!(definitions);
         Ok(())

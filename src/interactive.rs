@@ -1,4 +1,4 @@
-use crate::roles::{RoleAssignment, RoleAssignments};
+use crate::models::roles::{RoleAssignment, RoleAssignments};
 use anyhow::Result;
 use ratatui::{
     crossterm::{

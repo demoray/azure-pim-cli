@@ -9,27 +9,25 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod activate;
-pub mod assignments;
 mod az_cli;
 mod backend;
-mod definitions;
 mod graph;
 pub mod interactive;
 mod latest;
-pub mod resources;
-pub mod roles;
-pub mod scope;
+pub mod models;
 
 pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
-    assignments::{Assignment, Assignments},
     backend::Backend,
-    definitions::{Definition, Definitions},
     graph::get_objects_by_ids,
-    resources::ChildResource,
-    roles::{RoleAssignment, RoleAssignments},
-    scope::Scope,
+    models::{
+        assignments::{Assignment, Assignments},
+        definitions::{Definition, Definitions},
+        resources::ChildResource,
+        roles::{RoleAssignment, RoleAssignments},
+        scope::Scope,
+    },
 };
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;
