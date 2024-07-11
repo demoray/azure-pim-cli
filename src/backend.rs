@@ -75,6 +75,17 @@ macro_rules! try_or_stop {
     };
 }
 
+macro_rules! try_or_retry {
+    ($e:expr) => {
+        match $e {
+            Ok(x) => x,
+            Err(e) => {
+                return OperationResult::Retry(anyhow::Error::from(e));
+            }
+        }
+    };
+}
+
 pub(crate) struct Backend {
     pub(crate) client: Client,
     tokens: Mutex<BTreeMap<TokenScope, String>>,
@@ -110,7 +121,7 @@ impl Backend {
         validate: Option<for<'a> fn(StatusCode, &'a Value) -> Result<()>>,
     ) -> OperationResult<Value, anyhow::Error> {
         debug!("sending request: {request:?}");
-        let response = try_or_stop!(client.execute(request));
+        let response = try_or_retry!(client.execute(request));
         let status = response.status();
 
         debug!("got status sending request: {status:?}");
