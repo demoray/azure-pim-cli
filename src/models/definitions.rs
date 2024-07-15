@@ -5,7 +5,7 @@ pub(crate) struct Definitions {
     pub(crate) value: Vec<Definition>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Definition {
     pub id: String,
@@ -15,7 +15,7 @@ pub struct Definition {
     pub type_: String,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct Properties {
@@ -35,7 +35,7 @@ pub struct Properties {
     pub type_: String,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct Permission {

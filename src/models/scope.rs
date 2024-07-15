@@ -12,7 +12,7 @@ pub enum ScopeError {
     LeadingSlash,
 }
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Deserialize)]
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Deserialize, Hash)]
 pub struct Scope(pub(crate) String);
 impl Scope {
     pub fn new<S: Into<String>>(value: S) -> Result<Self, ScopeError> {
