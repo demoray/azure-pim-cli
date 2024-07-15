@@ -11,15 +11,18 @@
 mod activate;
 mod az_cli;
 mod backend;
+mod cache;
 mod graph;
 pub mod interactive;
 mod latest;
 pub mod models;
 
+use crate::graph::Object;
 pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
     backend::Backend,
+    cache::ExpiringMap,
     graph::get_objects_by_ids,
     models::{
         assignments::{Assignment, Assignments},
@@ -32,6 +35,7 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;
 use clap::ValueEnum;
+use parking_lot::Mutex;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use reqwest::Method;
 use std::{
@@ -80,12 +84,17 @@ impl ListFilter {
 
 pub struct PimClient {
     backend: Backend,
+    object_cache: Mutex<ExpiringMap<String, Object>>,
 }
 
 impl PimClient {
     pub fn new() -> Result<Self> {
         let backend = Backend::new();
-        Ok(Self { backend })
+        let object_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
+        Ok(Self {
+            backend,
+            object_cache,
+        })
     }
 
     pub fn current_user(&self) -> Result<String> {
