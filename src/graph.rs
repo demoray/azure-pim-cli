@@ -1,11 +1,8 @@
 use crate::{az_cli::TokenScope, PimClient};
 use anyhow::Result;
-use parking_lot::Mutex;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-
-static CACHE: Mutex<BTreeMap<String, Object>> = Mutex::new(BTreeMap::new());
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Object {
@@ -68,7 +65,7 @@ pub(crate) fn get_objects_by_ids(
     pim_client: &PimClient,
     ids: BTreeSet<&str>,
 ) -> Result<BTreeMap<String, Object>> {
-    let mut cache = CACHE.lock();
+    let mut cache = pim_client.object_cache.lock();
     let to_update = ids
         .iter()
         .filter(|id| !cache.contains_key(**id))
