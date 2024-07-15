@@ -11,7 +11,7 @@
 mod activate;
 mod az_cli;
 mod backend;
-mod cache;
+mod expiring;
 mod graph;
 pub mod interactive;
 mod latest;
@@ -22,7 +22,7 @@ pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
     backend::Backend,
-    cache::ExpiringMap,
+    expiring::ExpiringMap,
     graph::get_objects_by_ids,
     models::{
         assignments::{Assignment, Assignments},
@@ -85,16 +85,24 @@ impl ListFilter {
 pub struct PimClient {
     backend: Backend,
     object_cache: Mutex<ExpiringMap<String, Object>>,
+    role_definitions_cache: Mutex<ExpiringMap<Scope, Vec<Definition>>>,
 }
 
 impl PimClient {
     pub fn new() -> Result<Self> {
         let backend = Backend::new();
         let object_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
+        let role_definitions_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
         Ok(Self {
             backend,
             object_cache,
+            role_definitions_cache,
         })
+    }
+
+    pub fn clear_cache(&self) {
+        self.object_cache.lock().clear();
+        self.role_definitions_cache.lock().clear();
     }
 
     pub fn current_user(&self) -> Result<String> {
@@ -538,11 +546,19 @@ impl PimClient {
         ChildResource::parse(&value)
     }
 
-    /// List all assignments (not just those managed by PIM)
+    /// List role definitions available at the target scope
+    ///
+    /// Note, this will cache the results for 10 minutes.
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
     pub fn role_definitions(&self, scope: &Scope) -> Result<Vec<Definition>> {
+        let mut cache = self.role_definitions_cache.lock();
+
+        if let Some(cached) = cache.get(scope) {
+            return Ok(cached.clone());
+        }
+
         info!("listing role definitions for {scope}");
         let definitions = self
             .backend
@@ -551,6 +567,8 @@ impl PimClient {
             .send()
             .context("unable to list role definitions")?;
         let definitions: Definitions = serde_json::from_value(definitions)?;
+        cache.insert(scope.clone(), definitions.value.clone());
+
         Ok(definitions.value)
     }
 

@@ -21,6 +21,10 @@ impl<K: Hash + Eq, V> ExpiringMap<K, V> {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.data.clear();
+    }
+
     fn cleanup(&mut self) {
         let now = Instant::now();
         self.data.retain(|_, v| v.expiration > now);
