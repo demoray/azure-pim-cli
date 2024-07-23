@@ -55,20 +55,20 @@ Options:
           Only show errors
 
       --subscription <SUBSCRIPTION>
-          Filter at the Subscription level
+          Specify scope at the subscription level
 
       --resource-group <RESOURCE_GROUP>
-          List at the Resource Group level
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          List at the Provider level
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          List at a specified scope level
+          Specify the full scope directly
 
   -h, --help
           Print help (see a summary with '-h')
@@ -124,19 +124,16 @@ Options:
           Print help
 
 ```
-### az-pim activate role <ROLE> <SCOPE> <JUSTIFICATION>
+### az-pim activate role <ROLE> <JUSTIFICATION>
 
 ```
 Activate a specific role
 
-Usage: role [OPTIONS] <ROLE> <SCOPE> <JUSTIFICATION>
+Usage: role [OPTIONS] <ROLE> <JUSTIFICATION>
 
 Arguments:
   <ROLE>
           Name of the role to activate
-
-  <SCOPE>
-          Scope to activate
 
   <JUSTIFICATION>
           Justification for the request
@@ -159,6 +156,22 @@ Options:
           Duration to wait for the roles to be activated
 
           Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
+
+      --subscription <SUBSCRIPTION>
+          Specify scope at the subscription level
+
+      --resource-group <RESOURCE_GROUP>
+          Specify scope at the Resource Group level
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Specify scope at the Resource Provider level
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify the full scope directly
 
   -h, --help
           Print help (see a summary with '-h')
@@ -312,29 +325,42 @@ Options:
           Print help
 
 ```
-### az-pim deactivate role <ROLE> <SCOPE>
+### az-pim deactivate role <ROLE>
 
 ```
 Deactivate a specific role
 
-Usage: role [OPTIONS] <ROLE> <SCOPE>
+Usage: role [OPTIONS] <ROLE>
 
 Arguments:
   <ROLE>
           Name of the role to deactivate
 
-  <SCOPE>
-          Scope to deactivate
-
 Options:
+      --subscription <SUBSCRIPTION>
+          Specify scope at the subscription level
+
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
 
       --quiet
           Only show errors
 
+      --resource-group <RESOURCE_GROUP>
+          Specify scope at the Resource Group level
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Specify scope at the Resource Provider level
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify the full scope directly
+
   -h, --help
-          Print help
+          Print help (see a summary with '-h')
 
 ```
 #### Example Usage
@@ -446,7 +472,7 @@ Usage: orphaned-entries [OPTIONS]
 
 Options:
       --subscription <SUBSCRIPTION>
-          Subscription
+          Specify scope at the subscription level
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -455,17 +481,17 @@ Options:
           Only show errors
 
       --resource-group <RESOURCE_GROUP>
-          Resource Group
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          Provider
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          Specify scope directly
+          Specify the full scope directly
 
       --nested
           Delete nested assignments
@@ -533,7 +559,7 @@ Usage: list [OPTIONS]
 
 Options:
       --subscription <SUBSCRIPTION>
-          Subscription
+          Specify scope at the subscription level
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -542,17 +568,17 @@ Options:
           Only show errors
 
       --resource-group <RESOURCE_GROUP>
-          Resource Group
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          Provider
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          Specify scope directly
+          Specify the full scope directly
 
   -h, --help
           Print help (see a summary with '-h')
@@ -595,7 +621,7 @@ Arguments:
 
 Options:
       --subscription <SUBSCRIPTION>
-          Subscription
+          Specify scope at the subscription level
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -604,17 +630,17 @@ Options:
           Only show errors
 
       --resource-group <RESOURCE_GROUP>
-          Resource Group
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          Provider
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          Specify scope directly
+          Specify the full scope directly
 
   -h, --help
           Print help (see a summary with '-h')
@@ -668,7 +694,7 @@ Usage: delete-orphaned-entries [OPTIONS]
 
 Options:
       --subscription <SUBSCRIPTION>
-          Subscription
+          Specify scope at the subscription level
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -677,17 +703,17 @@ Options:
           Only show errors
 
       --resource-group <RESOURCE_GROUP>
-          Resource Group
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          Provider
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          Specify scope directly
+          Specify the full scope directly
 
       --nested
           Delete nested assignments
@@ -740,7 +766,7 @@ Usage: list [OPTIONS]
 
 Options:
       --subscription <SUBSCRIPTION>
-          Limit the scope by the specified Subscription
+          Specify scope at the subscription level
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -749,17 +775,17 @@ Options:
           Only show errors
 
       --resource-group <RESOURCE_GROUP>
-          Limit the scope by the specified Resource Group
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          Provider
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          Specify scope directly
+          Specify the full scope directly
 
   -h, --help
           Print help (see a summary with '-h')
@@ -864,7 +890,7 @@ Usage: list [OPTIONS]
 
 Options:
       --subscription <SUBSCRIPTION>
-          Limit the scope by the specified Subscription
+          Specify scope at the subscription level
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -873,17 +899,17 @@ Options:
           Only show errors
 
       --resource-group <RESOURCE_GROUP>
-          Limit the scope by the specified Resource Group
+          Specify scope at the Resource Group level
 
           This argument requires `subscription` to be set.
 
       --provider <PROVIDER>
-          Provider
+          Specify scope at the Resource Provider level
 
           This argument requires `subscription` and `resource_group` to be set.
 
       --scope <SCOPE>
-          Specify scope directly
+          Specify the full scope directly
 
   -h, --help
           Print help (see a summary with '-h')

@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
@@ -68,13 +68,13 @@ impl Cmd {
             | "az-pim role definition"
             | "az-pim role resources" => None,
             "az-pim list" => Some(include_str!("../help/az-pim-list.txt")),
-            "az-pim activate role <ROLE> <SCOPE> <JUSTIFICATION>" => {
+            "az-pim activate role <ROLE> <JUSTIFICATION>" => {
                 Some(include_str!("../help/az-pim-activate-role.txt"))
             }
             "az-pim activate set <JUSTIFICATION>" => {
                 Some(include_str!("../help/az-pim-activate-set.txt"))
             }
-            "az-pim deactivate role <ROLE> <SCOPE>" => {
+            "az-pim deactivate role <ROLE>" => {
                 Some(include_str!("../help/az-pim-deactivate-role.txt"))
             }
             "az-pim deactivate set" => Some(include_str!("../help/az-pim-deactivate-set.txt")),
@@ -118,25 +118,8 @@ enum SubCommand {
         #[clap(long, default_value_t = ListFilter::AsTarget)]
         filter: ListFilter,
 
-        /// Filter at the Subscription level
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// List at the Resource Group level
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// List at the Provider level
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// List at a specified scope level
-        #[arg(long, conflicts_with = "subscription")]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
 
     /// Activate eligible role assignments
@@ -173,15 +156,12 @@ enum SubCommand {
     Readme,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 enum ActivateSubCommand {
     /// Activate a specific role
     Role {
         /// Name of the role to activate
         role: Role,
-
-        /// Scope to activate
-        scope: Scope,
 
         /// Justification for the request
         justification: String,
@@ -197,6 +177,9 @@ enum ActivateSubCommand {
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
         wait: Option<HumanDuration>,
+
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
 
     /// Activate a set of roles
@@ -289,14 +272,15 @@ impl ActivateSubCommand {
         match self {
             Self::Role {
                 role,
-                scope,
                 justification,
                 duration,
                 wait,
+                scope,
             } => {
                 let roles = client
                     .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list eligible assignments")?;
+                let scope = scope.build().context("valid scope must be provided")?;
                 let entry = roles
                     .find(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
@@ -370,8 +354,9 @@ enum DeactivateSubCommand {
     Role {
         /// Name of the role to deactivate
         role: Role,
-        /// Scope to deactivate
-        scope: Scope,
+
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
     /// Deactivate a set of roles
     Set {
@@ -427,6 +412,7 @@ impl DeactivateSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::Role { role, scope } => {
+                let scope = scope.build().context("valid scope must be provided")?;
                 let roles = client
                     .list_active_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list active assignments")?;
@@ -457,25 +443,8 @@ impl DeactivateSubCommand {
 enum DeleteEligibleSubCommand {
     /// Delete assignments that objects in Microsoft Graph cannot be found
     OrphanedEntries {
-        /// Subscription
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// Resource Group
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// Provider
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
 
         /// Delete nested assignments
         #[arg(long)]
@@ -490,16 +459,8 @@ enum DeleteEligibleSubCommand {
 impl DeleteEligibleSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
-            Self::OrphanedEntries {
-                subscription,
-                resource_group,
-                provider,
-                scope,
-                nested,
-                yes,
-            } => {
-                let scope = build_scope(subscription, resource_group, scope, provider)?
-                    .context("valid scope must be provided")?;
+            Self::OrphanedEntries { scope, nested, yes } => {
+                let scope = scope.build().context("valid scope must be provided")?;
                 client.delete_orphaned_eligible_role_assignments(&scope, yes, nested)?;
             }
         }
@@ -532,25 +493,8 @@ enum RoleSubCommand {
 enum AssignmentSubCommand {
     /// List assignments
     List {
-        /// Subscription
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// Resource Group
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// Provider
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
 
     /// Delete an assignment
@@ -558,25 +502,8 @@ enum AssignmentSubCommand {
         /// Assignment name
         assignment_name: String,
 
-        /// Subscription
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// Resource Group
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// Provider
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
 
     /// Delete a set of assignments
@@ -588,25 +515,8 @@ enum AssignmentSubCommand {
 
     /// Delete assignments that objects in Microsoft Graph cannot be found
     DeleteOrphanedEntries {
-        /// Subscription
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// Resource Group
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// Provider
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
 
         /// Delete nested assignments
         #[arg(long)]
@@ -621,14 +531,8 @@ enum AssignmentSubCommand {
 impl AssignmentSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
-            Self::List {
-                subscription,
-                resource_group,
-                scope,
-                provider,
-            } => {
-                let scope = build_scope(subscription, resource_group, scope, provider)?
-                    .context("valid scope must be provided")?;
+            Self::List { scope } => {
+                let scope = scope.build().context("valid scope must be provided")?;
                 let objects = client
                     .role_assignments(&scope)
                     .context("unable to list active assignments")?;
@@ -636,13 +540,9 @@ impl AssignmentSubCommand {
             }
             Self::Delete {
                 assignment_name,
-                subscription,
-                resource_group,
                 scope,
-                provider,
             } => {
-                let scope = build_scope(subscription, resource_group, scope, provider)?
-                    .context("valid scope must be provided")?;
+                let scope = scope.build().context("valid scope must be provided")?;
                 client
                     .delete_role_assignment(&scope, &assignment_name)
                     .context("unable to delete assignment")?;
@@ -657,16 +557,8 @@ impl AssignmentSubCommand {
                         .context("unable to delete assignment")?;
                 }
             }
-            Self::DeleteOrphanedEntries {
-                subscription,
-                resource_group,
-                provider,
-                scope,
-                yes,
-                nested,
-            } => {
-                let scope = build_scope(subscription, resource_group, scope, provider)?
-                    .context("valid scope must be provided")?;
+            Self::DeleteOrphanedEntries { scope, yes, nested } => {
+                let scope = scope.build().context("valid scope must be provided")?;
 
                 client.delete_orphaned_role_assignments(&scope, yes, nested)?;
             }
@@ -679,38 +571,15 @@ impl AssignmentSubCommand {
 enum DefinitionSubCommand {
     /// List the definitions for the specific scope
     List {
-        /// Limit the scope by the specified Subscription
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// Limit the scope by the specified Resource Group
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// Provider
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
 }
 impl DefinitionSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
-            Self::List {
-                subscription,
-                resource_group,
-                scope,
-                provider,
-            } => {
-                let scope = build_scope(subscription, resource_group, scope, provider)?
-                    .context("valid scope must be provided")?;
+            Self::List { scope } => {
+                let scope = scope.build().context("valid scope must be provided")?;
                 output(&client.role_definitions(&scope)?)?;
             }
         }
@@ -722,39 +591,16 @@ impl DefinitionSubCommand {
 enum ResourcesSubCommand {
     /// List the child resources of a resource which you have eligible access
     List {
-        /// Limit the scope by the specified Subscription
-        #[arg(long)]
-        subscription: Option<Uuid>,
-
-        /// Limit the scope by the specified Resource Group
-        ///
-        /// This argument requires `subscription` to be set.
-        #[arg(long, requires = "subscription")]
-        resource_group: Option<String>,
-
-        /// Provider
-        ///
-        /// This argument requires `subscription` and `resource_group` to be set.
-        #[arg(long, requires = "resource_group")]
-        provider: Option<String>,
-
-        /// Specify scope directly
-        #[arg(long, conflicts_with = "subscription", required_unless_present_any = ["subscription", "resource_group", "provider"])]
-        scope: Option<Scope>,
+        #[clap(flatten)]
+        scope: ScopeBuilder,
     },
 }
 
 impl ResourcesSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
-            Self::List {
-                subscription,
-                resource_group,
-                scope,
-                provider,
-            } => {
-                let scope = build_scope(subscription, resource_group, scope, provider)?
-                    .context("valid scope must be provided")?;
+            Self::List { scope } => {
+                let scope = scope.build().context("valid scope must be provided")?;
                 output(&client.eligible_child_resources(&scope)?)?;
             }
         }
@@ -880,14 +726,10 @@ fn main() -> Result<()> {
     match args.command {
         SubCommand::List {
             active,
-            subscription,
-            resource_group,
-            provider,
-            scope,
             filter,
+            scope,
         } => {
-            let scope = build_scope(subscription, resource_group, scope, provider)?;
-
+            let scope = scope.build();
             let roles = if active {
                 client.list_active_role_assignments(scope, Some(filter))?
             } else {
@@ -910,28 +752,6 @@ fn main() -> Result<()> {
         SubCommand::Init { shell } => {
             Cmd::shell_completion(shell);
             Ok(())
-        }
-    }
-}
-
-fn build_scope(
-    subscription: Option<Uuid>,
-    resource_group: Option<String>,
-    scope: Option<Scope>,
-    provider: Option<String>,
-) -> Result<Option<Scope>> {
-    match (subscription, resource_group, provider, scope) {
-        (Some(subscription), Some(group), Some(provider), None) => {
-            Ok(Some(Scope::from_provider(&subscription, &group, &provider)))
-        }
-        (Some(subscription), Some(group), None, None) => {
-            Ok(Some(Scope::from_resource_group(&subscription, &group)))
-        }
-        (Some(subscription), None, None, None) => Ok(Some(Scope::from_subscription(&subscription))),
-        (None, None, None, Some(scope)) => Ok(Some(scope)),
-        (None, None, None, None) => Ok(None),
-        _ => {
-            bail!("invalid scope");
         }
     }
 }
@@ -995,6 +815,56 @@ impl Verbosity {
                 0 => LevelFilter::INFO,
                 1 => LevelFilter::DEBUG,
                 _ => LevelFilter::TRACE,
+            }
+        }
+    }
+}
+
+#[derive(Args)]
+#[command(about = None)]
+struct ScopeBuilder {
+    /// Specify scope at the subscription level
+    #[arg(long)]
+    subscription: Option<Uuid>,
+
+    /// Specify scope at the Resource Group level
+    ///
+    /// This argument requires `subscription` to be set.
+    #[arg(long, requires = "subscription")]
+    resource_group: Option<String>,
+
+    /// Specify scope at the Resource Provider level
+    ///
+    /// This argument requires `subscription` and `resource_group` to be set.
+    #[arg(long, requires = "resource_group")]
+    provider: Option<String>,
+
+    /// Specify the full scope directly
+    #[arg(long, conflicts_with = "subscription")]
+    scope: Option<Scope>,
+}
+
+impl ScopeBuilder {
+    fn build(self) -> Option<Scope> {
+        let Self {
+            subscription,
+            resource_group,
+            provider,
+            scope,
+        } = self;
+
+        match (subscription, resource_group, provider, scope) {
+            (Some(subscription), Some(group), Some(provider), None) => {
+                Some(Scope::from_provider(&subscription, &group, &provider))
+            }
+            (Some(subscription), Some(group), None, None) => {
+                Some(Scope::from_resource_group(&subscription, &group))
+            }
+            (Some(subscription), None, None, None) => Some(Scope::from_subscription(&subscription)),
+            (None, None, None, Some(scope)) => Some(scope),
+            (None, None, None, None) => None,
+            _ => {
+                unreachable!("invalid combination of arguments provided");
             }
         }
     }
