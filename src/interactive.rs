@@ -1,4 +1,4 @@
-use crate::models::roles::{RoleAssignment, RoleAssignments};
+use crate::models::roles::RoleAssignment;
 use anyhow::Result;
 use ratatui::{
     crossterm::{
@@ -15,7 +15,7 @@ use ratatui::{
         Block, BorderType, HighlightSpacing, Paragraph, Row, ScrollbarState, Table, TableState,
     },
 };
-use std::io::stdout;
+use std::{collections::BTreeSet, io::stdout};
 
 const ENABLED: &str = " ✓ ";
 const DISABLED: &str = " ☐ ";
@@ -27,7 +27,7 @@ const ALL_HELP: &str = "Tab or Shift-Tab to change sections | Enter to activate 
 const ITEM_HEIGHT: u16 = 2;
 
 pub struct Selected {
-    pub assignments: RoleAssignments,
+    pub assignments: BTreeSet<RoleAssignment>,
     pub justification: String,
     pub duration: u64,
 }
@@ -57,7 +57,7 @@ struct App {
 
 impl App {
     fn new(
-        assignments: RoleAssignments,
+        assignments: BTreeSet<RoleAssignment>,
         justification: Option<String>,
         duration: Option<u64>,
     ) -> Result<Self> {
@@ -71,9 +71,8 @@ impl App {
             table_state: TableState::default().with_selected(0),
             justification,
             longest_item_lens: column_widths(&assignments)?,
-            scroll_state: ScrollbarState::new((assignments.0.len() - 1) * usize::from(ITEM_HEIGHT)),
+            scroll_state: ScrollbarState::new((assignments.len() - 1) * usize::from(ITEM_HEIGHT)),
             items: assignments
-                .0
                 .into_iter()
                 .map(|value| Entry {
                     value,
@@ -347,14 +346,14 @@ impl App {
                         (InputState::Scopes, Up) => self.previous(),
                         (_, Esc) => return Ok(None),
                         (_, Enter) if self.warnings.is_empty() => {
-                            let items = self
+                            let assignments = self
                                 .items
                                 .into_iter()
                                 .filter(|entry| entry.enabled)
                                 .map(|entry| entry.value)
                                 .collect();
                             return Ok(Some(Selected {
-                                assignments: RoleAssignments(items),
+                                assignments,
                                 justification: self.justification.unwrap_or_default(),
                                 duration: self.duration.unwrap_or_default(),
                             }));
@@ -369,7 +368,7 @@ impl App {
 }
 
 pub fn interactive_ui(
-    items: RoleAssignments,
+    items: BTreeSet<RoleAssignment>,
     justification: Option<String>,
     duration: Option<u64>,
 ) -> Result<Option<Selected>> {
@@ -392,10 +391,9 @@ pub fn interactive_ui(
     res
 }
 
-fn column_widths(items: &RoleAssignments) -> Result<(u16, u16)> {
+fn column_widths(items: &BTreeSet<RoleAssignment>) -> Result<(u16, u16)> {
     let (scope_name_len, role_len, scope_len) =
         items
-            .0
             .iter()
             .fold((0, 0, 0), |(scope_name_len, role_len, scope_len), x| {
                 (

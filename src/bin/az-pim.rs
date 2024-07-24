@@ -4,7 +4,7 @@ use azure_pim_cli::{
     interactive::{interactive_ui, Selected},
     models::{
         assignments::Assignment,
-        roles::{Role, RoleAssignments},
+        roles::{Role, RoleAssignment, RolesExt},
         scope::Scope,
     },
     ListFilter, PimClient,
@@ -282,15 +282,13 @@ impl ActivateSubCommand {
                     .context("unable to list eligible assignments")?;
                 let scope = scope.build().context("valid scope must be provided")?;
                 let entry = roles
-                    .find(&role, &scope)
+                    .find_role(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
-                client.activate_role_assignment(entry, &justification, duration.into())?;
+                client.activate_role_assignment(&entry, &justification, duration.into())?;
 
                 if let Some(wait) = wait {
-                    client.wait_for_role_activation(
-                        &RoleAssignments([entry.clone()].into()),
-                        wait.into(),
-                    )?;
+                    let assignments = [entry].into();
+                    client.wait_for_role_activation(&assignments, wait.into())?;
                 }
             }
             Self::Set {
@@ -416,8 +414,8 @@ impl DeactivateSubCommand {
                 let roles = client
                     .list_active_role_assignments(None, Some(ListFilter::AsTarget))
                     .context("unable to list active assignments")?;
-                let entry = roles.find(&role, &scope).context("role not found")?;
-                client.deactivate_role_assignment(entry)?;
+                let entry = roles.find_role(&role, &scope).context("role not found")?;
+                client.deactivate_role_assignment(&entry)?;
             }
             Self::Set {
                 config,
@@ -761,7 +759,7 @@ fn build_set(
     config: Option<PathBuf>,
     role: Option<Vec<(Role, Scope)>>,
     active: bool,
-) -> Result<RoleAssignments> {
+) -> Result<BTreeSet<RoleAssignment>> {
     let mut desired_roles = role.unwrap_or_default();
 
     if let Some(path) = config {
@@ -786,12 +784,12 @@ fn build_set(
     let mut to_add = BTreeSet::new();
     for (role, scope) in desired_roles {
         let entry = assignments
-            .find(&role, &scope)
+            .find_role(&role, &scope)
             .with_context(|| format!("role not found.  role:{role} scope:{scope}"))?;
         to_add.insert(entry);
     }
 
-    Ok(RoleAssignments(to_add.into_iter().cloned().collect()))
+    Ok(to_add)
 }
 
 #[derive(Args)]
