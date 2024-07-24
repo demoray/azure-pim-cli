@@ -17,18 +17,17 @@ pub mod interactive;
 mod latest;
 pub mod models;
 
-use crate::graph::Object;
 pub use crate::latest::check_latest_version;
 use crate::{
     activate::check_error_response,
     backend::Backend,
     expiring::ExpiringMap,
-    graph::get_objects_by_ids,
+    graph::{get_objects_by_ids, Object},
     models::{
         assignments::{Assignment, Assignments},
         definitions::{Definition, Definitions},
         resources::ChildResource,
-        roles::{RoleAssignment, RoleAssignments},
+        roles::{RoleAssignment, RolesExt},
         scope::Scope,
     },
 };
@@ -129,7 +128,7 @@ impl PimClient {
         &self,
         scope: Option<Scope>,
         filter: Option<ListFilter>,
-    ) -> Result<RoleAssignments> {
+    ) -> Result<BTreeSet<RoleAssignment>> {
         let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
         if let Some(scope) = &scope {
             info!("listing eligible assignments for {scope}");
@@ -151,9 +150,8 @@ impl PimClient {
         let response = builder
             .send()
             .context("unable to list eligible assignments")?;
-        let mut results = RoleAssignments::parse(&response, with_principal)
-            .context("unable to parse eligible assignments")?
-            .0;
+        let mut results = RoleAssignment::parse(&response, with_principal)
+            .context("unable to parse eligible assignments")?;
 
         if with_principal {
             let ids = results
@@ -173,7 +171,7 @@ impl PimClient {
                 .collect();
         }
 
-        Ok(RoleAssignments(results))
+        Ok(results)
     }
 
     /// List the roles active role assignments for the current user
@@ -184,7 +182,7 @@ impl PimClient {
         &self,
         scope: Option<Scope>,
         filter: Option<ListFilter>,
-    ) -> Result<RoleAssignments> {
+    ) -> Result<BTreeSet<RoleAssignment>> {
         let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
 
         if let Some(scope) = &scope {
@@ -208,9 +206,8 @@ impl PimClient {
         let response = builder
             .send()
             .context("unable to list active assignments")?;
-        let mut results = RoleAssignments::parse(&response, with_principal)
-            .context("unable to parse active assignments")?
-            .0;
+        let mut results = RoleAssignment::parse(&response, with_principal)
+            .context("unable to parse active assignments")?;
 
         if with_principal {
             let ids = results
@@ -229,7 +226,7 @@ impl PimClient {
                 })
                 .collect();
         }
-        Ok(RoleAssignments(results))
+        Ok(results)
     }
 
     /// Request extending the specified role eligibility
@@ -327,34 +324,32 @@ impl PimClient {
 
     pub fn activate_role_assignment_set(
         &self,
-        assignments: &RoleAssignments,
+        assignments: &BTreeSet<RoleAssignment>,
         justification: &str,
         duration: Duration,
         concurrency: usize,
     ) -> Result<()> {
-        ensure!(!assignments.0.is_empty(), "no roles specified");
+        ensure!(!assignments.is_empty(), "no roles specified");
 
         Self::thread_builder(concurrency);
 
         let results = assignments
-            .0
-            .clone()
             .into_par_iter()
             .map(
-                |entry| match self.activate_role_assignment(&entry, justification, duration) {
+                |entry| match self.activate_role_assignment(entry, justification, duration) {
                     Ok(()) => ActivationResult::Success,
                     Err(error) => {
                         error!(
                             "scope: {} definition: {} error: {error:?}",
                             entry.scope, entry.role_definition_id
                         );
-                        ActivationResult::Failed(entry)
+                        ActivationResult::Failed(entry.clone())
                     }
                 },
             )
             .collect::<Vec<_>>();
 
-        let mut failed = RoleAssignments::default();
+        let mut failed = BTreeSet::new();
 
         for result in results {
             match result {
@@ -412,30 +407,28 @@ impl PimClient {
 
     pub fn deactivate_role_assignment_set(
         &self,
-        assignments: &RoleAssignments,
+        assignments: &BTreeSet<RoleAssignment>,
         concurrency: usize,
     ) -> Result<()> {
-        ensure!(!assignments.0.is_empty(), "no roles specified");
+        ensure!(!assignments.is_empty(), "no roles specified");
 
         Self::thread_builder(concurrency);
 
         let results = assignments
-            .0
-            .clone()
             .into_par_iter()
-            .map(|entry| match self.deactivate_role_assignment(&entry) {
+            .map(|entry| match self.deactivate_role_assignment(entry) {
                 Ok(()) => ActivationResult::Success,
                 Err(error) => {
                     error!(
                         "scope: {} definition: {} error: {error:?}",
                         entry.scope, entry.role_definition_id
                     );
-                    ActivationResult::Failed(entry)
+                    ActivationResult::Failed(entry.clone())
                 }
             })
             .collect::<Vec<_>>();
 
-        let mut failed = RoleAssignments::default();
+        let mut failed = BTreeSet::new();
 
         for result in results {
             match result {
@@ -458,7 +451,7 @@ impl PimClient {
 
     pub fn wait_for_role_activation(
         &self,
-        assignments: &RoleAssignments,
+        assignments: &BTreeSet<RoleAssignment>,
         wait_timeout: Duration,
     ) -> Result<()> {
         if assignments.is_empty() {
@@ -690,7 +683,7 @@ impl PimClient {
 
         for scope in scopes {
             let definitions = self.role_definitions(&scope)?;
-            for entry in self.list_eligible_role_assignments(Some(scope), None)?.0 {
+            for entry in self.list_eligible_role_assignments(Some(scope), None)? {
                 if entry.object.is_some() {
                     continue;
                 }

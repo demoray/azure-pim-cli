@@ -1,5 +1,5 @@
 use anyhow::Result;
-use azure_pim_cli::{models::roles::RoleAssignments, ListFilter, PimClient};
+use azure_pim_cli::{ListFilter, PimClient};
 use clap::Parser;
 use std::{collections::BTreeSet, io::stderr, time::Duration};
 use tracing::{info, level_filters::LevelFilter};
@@ -28,12 +28,12 @@ fn main() -> Result<()> {
     let client = PimClient::new()?;
     let active = client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
     let mut total = client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
-    total.0.extend(active.0.clone());
+    total.extend(active.clone());
 
-    let mut to_activate = RoleAssignments::default();
+    let mut to_activate = BTreeSet::new();
 
     let mut scopes = BTreeSet::new();
-    for role_assignment in total.0 {
+    for role_assignment in total {
         if role_assignment.scope.subscription().is_none() {
             continue;
         }
@@ -46,7 +46,7 @@ fn main() -> Result<()> {
 
         info!("checking {}", role_assignment.scope_name);
 
-        if !active.0.contains(&role_assignment) {
+        if !active.contains(&role_assignment) {
             to_activate.insert(role_assignment.clone());
         }
 

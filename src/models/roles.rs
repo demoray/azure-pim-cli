@@ -26,62 +26,71 @@ impl FromStr for Role {
     }
 }
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Default, Clone)]
-pub struct RoleAssignments(pub BTreeSet<RoleAssignment>);
+pub trait RolesExt {
+    fn find_role(&self, role: &Role, scope: &Scope) -> Option<RoleAssignment>;
+    fn friendly(&self) -> String;
+}
 
-impl RoleAssignments {
+impl RolesExt for &BTreeSet<RoleAssignment> {
     #[must_use]
-    pub fn find(&self, role: &Role, scope: &Scope) -> Option<&RoleAssignment> {
-        let scope = scope.0.to_lowercase();
+    fn find_role(&self, role: &Role, scope: &Scope) -> Option<RoleAssignment> {
         let role = role.0.to_lowercase();
-        self.0
-            .iter()
-            .find(|v| v.role.0.to_lowercase() == role && v.scope.0.to_lowercase() == scope)
-            .or_else(|| {
-                self.0.iter().find(|v| {
-                    v.role.0.to_lowercase() == role && v.scope_name.to_lowercase() == scope
-                })
-            })
+        self.iter()
+            .find(|v| v.role.0.to_lowercase() == role && &v.scope == scope)
+            .cloned()
     }
 
-    #[must_use]
-    pub fn contains(&self, entry: &RoleAssignment) -> bool {
-        self.0.contains(entry)
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub(crate) fn friendly(&self) -> String {
-        self.0
-            .iter()
+    fn friendly(&self) -> String {
+        self.iter()
             .map(|x| format!("* {}", x.friendly()))
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
 
-    pub fn insert(&mut self, entry: RoleAssignment) -> bool {
-        self.0.insert(entry)
+impl RolesExt for BTreeSet<RoleAssignment> {
+    #[must_use]
+    fn find_role(&self, role: &Role, scope: &Scope) -> Option<RoleAssignment> {
+        (&self).find_role(role, scope)
     }
 
-    pub(crate) fn retain<F>(&mut self, f: F)
-    where
-        F: FnMut(&RoleAssignment) -> bool,
-    {
-        self.0.retain(f);
+    fn friendly(&self) -> String {
+        (&self).friendly()
+    }
+}
+
+#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
+pub struct RoleAssignment {
+    pub role: Role,
+    pub scope: Scope,
+    pub scope_name: String,
+    #[serde(skip)]
+    pub role_definition_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub principal_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub principal_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object: Option<Object>,
+}
+
+impl RoleAssignment {
+    pub(crate) fn friendly(&self) -> String {
+        format!(
+            "\"{}\" in \"{}\" ({})",
+            self.role, self.scope_name, self.scope
+        )
     }
 
     // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
     // that allows further nested nulls
     #[allow(clippy::indexing_slicing)]
-    pub(crate) fn parse(body: &Value, with_principal: bool) -> Result<Self> {
+    pub(crate) fn parse(body: &Value, with_principal: bool) -> Result<BTreeSet<Self>> {
         let Some(values) = body["value"].as_array() else {
             bail!("unable to parse response: missing value array: {body:#?}");
         };
 
-        let mut results = Self::default();
+        let mut results = BTreeSet::new();
         for entry in values {
             let Some(role) = entry["properties"]["expandedProperties"]["roleDefinition"]
                 ["displayName"]
@@ -126,7 +135,7 @@ impl RoleAssignments {
                 (None, None)
             };
 
-            results.insert(RoleAssignment {
+            results.insert(Self {
                 role,
                 scope,
                 scope_name,
@@ -141,33 +150,9 @@ impl RoleAssignments {
     }
 }
 
-#[derive(Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
-pub struct RoleAssignment {
-    pub role: Role,
-    pub scope: Scope,
-    pub scope_name: String,
-    #[serde(skip)]
-    pub role_definition_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub principal_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub principal_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub object: Option<Object>,
-}
-
-impl RoleAssignment {
-    pub(crate) fn friendly(&self) -> String {
-        format!(
-            "\"{}\" in \"{}\" ({})",
-            self.role, self.scope_name, self.scope
-        )
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{RoleAssignments, Scope};
+    use super::{RoleAssignment, Scope};
     use anyhow::Result;
     use insta::assert_json_snapshot;
     use uuid::Uuid;
@@ -175,9 +160,9 @@ mod tests {
     #[test]
     fn parse_active() -> Result<()> {
         const ASSIGNMENTS: &str = include_str!("../../tests/data/role-assignments.json");
-        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?, false)?;
+        let assignments = RoleAssignment::parse(&serde_json::from_str(ASSIGNMENTS)?, false)?;
         assert_json_snapshot!(&assignments);
-        let assignments = RoleAssignments::parse(&serde_json::from_str(ASSIGNMENTS)?, true)?;
+        let assignments = RoleAssignment::parse(&serde_json::from_str(ASSIGNMENTS)?, true)?;
         assert_json_snapshot!(&assignments);
         Ok(())
     }
