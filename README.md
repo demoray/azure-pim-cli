@@ -180,7 +180,7 @@ Options:
 #### Example Usage
 
 ```
-$ az-pim activate role Owner "My Subscription" "developing pim"
+$ az-pim activate role Owner "developing pim" --subscription 00000000-0000-0000-0000-000000000000
 2024-06-27T16:55:27.676291Z  INFO az_pim: activating Owner in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
 $
 ```
@@ -366,7 +366,7 @@ Options:
 #### Example Usage
 
 ```
-$ az-pim deactivate role "Storage Queue Data Contributor" "My Subscription"
+$ az-pim deactivate role "Storage Queue Data Contributor" --subscription 00000000-0000-0000-0000-000000000000
 2024-06-27T17:57:53.462674Z  INFO az_pim: deactivating Storage Queue Data Contributor in My Subscription (/subscriptions/00000000-0000-0000-0000-000000000000)
 $
 ```
