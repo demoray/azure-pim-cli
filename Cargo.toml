@@ -20,7 +20,7 @@ home = "0.5"
 humantime = "2.1"
 itertools = "0.13"
 parking_lot = "0.12"
-ratatui = { version = "0.27", features = ["crossterm"] }
+ratatui = { version = "0.28", features = ["crossterm"] }
 rayon = "1.10"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 retry = "2.0"
