@@ -9,8 +9,8 @@ Commands:
   list        List active or eligible assignments
   activate    Activate eligible role assignments
   deactivate  Deactivate eligible role assignments
-  delete      Delete eligible role assignments
   role        Manage Azure role-based access control (Azure RBAC)
+  cleanup
   init        Setup shell tab completions
 
 Options:
@@ -442,67 +442,6 @@ Options:
           Print help (see a summary with '-h')
 
 ```
-## az-pim delete
-
-```
-Delete eligible role assignments
-
-Usage: delete [OPTIONS] <COMMAND>
-
-Commands:
-  orphaned-entries  Delete assignments that objects in Microsoft Graph cannot be found
-
-Options:
-      --verbose...
-          Increase logging verbosity.  Provide repeatedly to increase the verbosity
-
-      --quiet
-          Only show errors
-
-  -h, --help
-          Print help
-
-```
-### az-pim delete orphaned-entries
-
-```
-Delete assignments that objects in Microsoft Graph cannot be found
-
-Usage: orphaned-entries [OPTIONS]
-
-Options:
-      --subscription <SUBSCRIPTION>
-          Specify scope at the subscription level
-
-      --verbose...
-          Increase logging verbosity.  Provide repeatedly to increase the verbosity
-
-      --quiet
-          Only show errors
-
-      --resource-group <RESOURCE_GROUP>
-          Specify scope at the Resource Group level
-
-          This argument requires `subscription` to be set.
-
-      --provider <PROVIDER>
-          Specify scope at the Resource Provider level
-
-          This argument requires `subscription` and `resource_group` to be set.
-
-      --scope <SCOPE>
-          Specify the full scope directly
-
-      --nested
-          Delete nested assignments
-
-      --yes
-          Always respond yes to confirmations
-
-  -h, --help
-          Print help (see a summary with '-h')
-
-```
 ## az-pim role
 
 ```
@@ -534,10 +473,9 @@ Manage role assignments
 Usage: assignment [OPTIONS] <COMMAND>
 
 Commands:
-  list                     List assignments
-  delete                   Delete an assignment
-  delete-set               Delete a set of assignments
-  delete-orphaned-entries  Delete assignments that objects in Microsoft Graph cannot be found
+  list        List assignments
+  delete      Delete an assignment
+  delete-set  Delete a set of assignments
 
 Options:
       --verbose...
@@ -682,57 +620,6 @@ $ az-pim role assignment list --subscription 00000000-0000-0000-0000-00000000000
 2024-07-09T18:54:48.903483Z  INFO azure_pim_cli: listing assignments assignments
 2024-07-09T18:19:32.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000001 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
 2024-07-09T18:19:32.222267Z  INFO azure_pim_cli: deleting assignment 00000000-0000-0000-0000-000000000002 from /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount
-$
-```
-
-#### az-pim role assignment delete-orphaned-entries
-
-```
-Delete assignments that objects in Microsoft Graph cannot be found
-
-Usage: delete-orphaned-entries [OPTIONS]
-
-Options:
-      --subscription <SUBSCRIPTION>
-          Specify scope at the subscription level
-
-      --verbose...
-          Increase logging verbosity.  Provide repeatedly to increase the verbosity
-
-      --quiet
-          Only show errors
-
-      --resource-group <RESOURCE_GROUP>
-          Specify scope at the Resource Group level
-
-          This argument requires `subscription` to be set.
-
-      --provider <PROVIDER>
-          Specify scope at the Resource Provider level
-
-          This argument requires `subscription` and `resource_group` to be set.
-
-      --scope <SCOPE>
-          Specify the full scope directly
-
-      --nested
-          Delete nested assignments
-
-      --yes
-          Always respond yes to confirmations
-
-  -h, --help
-          Print help (see a summary with '-h')
-
-```
-##### Example Usage
-
-```
-$ az-pim role assignment delete-orphaned-entries --subscription 00000000-0000-0000-0000-000000000001
-2024-07-09T19:54:45.843289Z  INFO azure_pim_cli: listing assignments
-2024-07-09T19:54:48.142932Z  INFO azure_pim_cli: listing role definitions
-2024-07-09T19:54:48.421671Z  INFO az_pim: Are you sure you want to delete role: "Storage Queue Data Contributor" principal:00000000-0000-0000-0000-000000000000 (type: ServicePrincipal) scope:/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-resource-group/providers/Microsoft.Storage/storageAccounts/mystorageaccount? (y/n):
-y
 $
 ```
 
@@ -933,6 +820,147 @@ $ az-pim role resources list --subscription 00000000-0000-0000-0000-000000000000
 ]
 ```
 
+## az-pim cleanup
+
+```
+Usage: cleanup [OPTIONS] <COMMAND>
+
+Commands:
+  auto                           Delete orphaned role assignments and orphaned eligibile role assignments
+  orphaned-assignments           Delete orphaned role assignments
+  orphaned-eligible-assignments  Delete orphaned eligible role assignments
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+### az-pim cleanup auto
+
+```
+Delete orphaned role assignments and orphaned eligibile role assignments
+
+Usage: auto [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Specify scope at the subscription level
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Specify scope at the Resource Group level
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Specify scope at the Resource Provider level
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify the full scope directly
+
+      --skip-nested
+          Do not check for nested assignments
+
+      --yes
+          Always respond yes to confirmations
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+### az-pim cleanup orphaned-assignments
+
+```
+Delete orphaned role assignments
+
+Usage: orphaned-assignments [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Specify scope at the subscription level
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Specify scope at the Resource Group level
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Specify scope at the Resource Provider level
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify the full scope directly
+
+      --skip-nested
+          Do not check for nested assignments
+
+      --yes
+          Always respond yes to confirmations
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+### az-pim cleanup orphaned-eligible-assignments
+
+```
+Delete orphaned eligible role assignments
+
+Usage: orphaned-eligible-assignments [OPTIONS]
+
+Options:
+      --subscription <SUBSCRIPTION>
+          Specify scope at the subscription level
+
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+      --resource-group <RESOURCE_GROUP>
+          Specify scope at the Resource Group level
+
+          This argument requires `subscription` to be set.
+
+      --provider <PROVIDER>
+          Specify scope at the Resource Provider level
+
+          This argument requires `subscription` and `resource_group` to be set.
+
+      --scope <SCOPE>
+          Specify the full scope directly
+
+      --skip-nested
+          Do not check for nested assignments
+
+      --yes
+          Always respond yes to confirmations
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
 ## az-pim init <SHELL>
 
 ```
