@@ -161,7 +161,7 @@ impl App {
             ));
         }
 
-        let rects = Layout::vertical(sections).split(f.size());
+        let rects = Layout::vertical(sections).split(f.area());
         let mut rects = rects.iter();
 
         // from here forward, if the next() call fails, we return early as the
@@ -244,7 +244,7 @@ impl App {
         );
         if self.input_state == InputState::Justification {
             #[allow(clippy::cast_possible_truncation)]
-            frame.set_cursor(area.x + justification.len() as u16 + 1, area.y + 1);
+            frame.set_cursor_position((area.x + justification.len() as u16 + 1, area.y + 1));
         }
     }
 
