@@ -54,20 +54,23 @@ impl Cmd {
     fn example(cmd: &str) -> Option<&'static str> {
         match cmd {
             "az-pim"
-            | "az-pim activate"
             | "az-pim activate interactive"
+            | "az-pim activate"
+            | "az-pim cleanup auto"
+            | "az-pim cleanup orphaned-assignments"
+            | "az-pim cleanup orphaned-eligible-assignments"
+            | "az-pim cleanup"
+            | "az-pim deactivate interactive"
             | "az-pim deactivate"
-            | "az-pim delete"
-            | "az-pim delete role <ROLE> <SCOPE>"
-            | "az-pim delete set"
             | "az-pim delete interactive"
             | "az-pim delete orphaned-entries"
-            | "az-pim deactivate interactive"
-            | "az-pim role"
+            | "az-pim delete role <ROLE> <SCOPE>"
+            | "az-pim delete set"
+            | "az-pim delete"
             | "az-pim role assignment"
             | "az-pim role definition"
-            | "az-pim role resources" => None,
-            "az-pim list" => Some(include_str!("../help/az-pim-list.txt")),
+            | "az-pim role resources"
+            | "az-pim role" => None,
             "az-pim activate role <ROLE> <JUSTIFICATION>" => {
                 Some(include_str!("../help/az-pim-activate-role.txt"))
             }
@@ -79,18 +82,19 @@ impl Cmd {
             }
             "az-pim deactivate set" => Some(include_str!("../help/az-pim-deactivate-set.txt")),
             "az-pim init <SHELL>" => Some(include_str!("../help/az-pim-init.txt")),
-            "az-pim role assignment list" => {
-                Some(include_str!("../help/az-pim-role-assignment-list.txt"))
-            }
-            "az-pim role assignment delete <ASSIGNMENT_NAME>" => {
-                Some(include_str!("../help/az-pim-role-assignment-delete.txt"))
-            }
-            "az-pim role assignment delete-set <CONFIG>" => Some(include_str!(
-                "../help/az-pim-role-assignment-delete-set.txt"
-            )),
+            "az-pim list" => Some(include_str!("../help/az-pim-list.txt")),
             "az-pim role assignment delete-orphaned-entries" => Some(include_str!(
                 "../help/az-pim-role-assignment-delete-orphan-entries.txt"
             )),
+            "az-pim role assignment delete-set <CONFIG>" => Some(include_str!(
+                "../help/az-pim-role-assignment-delete-set.txt"
+            )),
+            "az-pim role assignment delete <ASSIGNMENT_NAME>" => {
+                Some(include_str!("../help/az-pim-role-assignment-delete.txt"))
+            }
+            "az-pim role assignment list" => {
+                Some(include_str!("../help/az-pim-role-assignment-list.txt"))
+            }
             "az-pim role definition list" => {
                 Some(include_str!("../help/az-pim-role-definition-list.txt"))
             }
@@ -134,16 +138,15 @@ enum SubCommand {
         cmd: DeactivateSubCommand,
     },
 
-    /// Delete eligible role assignments
-    Delete {
-        #[clap(subcommand)]
-        cmd: DeleteEligibleSubCommand,
-    },
-
     /// Manage Azure role-based access control (Azure RBAC).
     Role {
         #[clap(subcommand)]
         cmd: RoleSubCommand,
+    },
+
+    Cleanup {
+        #[clap(subcommand)]
+        cmd: CleanupSubCommand,
     },
 
     /// Setup shell tab completions
@@ -438,35 +441,6 @@ impl DeactivateSubCommand {
 }
 
 #[derive(Subcommand)]
-enum DeleteEligibleSubCommand {
-    /// Delete assignments that objects in Microsoft Graph cannot be found
-    OrphanedEntries {
-        #[clap(flatten)]
-        scope: ScopeBuilder,
-
-        /// Delete nested assignments
-        #[arg(long)]
-        nested: bool,
-
-        /// Always respond yes to confirmations
-        #[arg(long)]
-        yes: bool,
-    },
-}
-
-impl DeleteEligibleSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
-        match self {
-            Self::OrphanedEntries { scope, nested, yes } => {
-                let scope = scope.build().context("valid scope must be provided")?;
-                client.delete_orphaned_eligible_role_assignments(&scope, yes, nested)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Subcommand)]
 enum RoleSubCommand {
     /// Manage role assignments
     Assignment {
@@ -510,20 +484,6 @@ enum AssignmentSubCommand {
         /// Path to a JSON config file containing a set of assignments to delete
         config: PathBuf,
     },
-
-    /// Delete assignments that objects in Microsoft Graph cannot be found
-    DeleteOrphanedEntries {
-        #[clap(flatten)]
-        scope: ScopeBuilder,
-
-        /// Delete nested assignments
-        #[arg(long)]
-        nested: bool,
-
-        /// Always respond yes to confirmations
-        #[arg(long)]
-        yes: bool,
-    },
 }
 
 impl AssignmentSubCommand {
@@ -555,10 +515,88 @@ impl AssignmentSubCommand {
                         .context("unable to delete assignment")?;
                 }
             }
-            Self::DeleteOrphanedEntries { scope, yes, nested } => {
-                let scope = scope.build().context("valid scope must be provided")?;
+        }
+        Ok(())
+    }
+}
 
-                client.delete_orphaned_role_assignments(&scope, yes, nested)?;
+#[derive(Subcommand)]
+enum CleanupSubCommand {
+    /// Delete orphaned role assignments and orphaned eligibile role assignments
+    Auto {
+        #[clap(flatten)]
+        scope: ScopeBuilder,
+
+        /// Do not check for nested assignments
+        #[arg(long)]
+        skip_nested: bool,
+
+        /// Always respond yes to confirmations
+        #[arg(long)]
+        yes: bool,
+    },
+
+    /// Delete orphaned role assignments
+    OrphanedAssignments {
+        #[clap(flatten)]
+        scope: ScopeBuilder,
+
+        /// Do not check for nested assignments
+        #[arg(long)]
+        skip_nested: bool,
+
+        /// Always respond yes to confirmations
+        #[arg(long)]
+        yes: bool,
+    },
+
+    /// Delete orphaned eligible role assignments
+    OrphanedEligibleAssignments {
+        #[clap(flatten)]
+        scope: ScopeBuilder,
+
+        /// Do not check for nested assignments
+        #[arg(long)]
+        skip_nested: bool,
+
+        /// Always respond yes to confirmations
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+impl CleanupSubCommand {
+    fn run(self, client: &PimClient) -> Result<()> {
+        match self {
+            Self::Auto {
+                scope,
+                skip_nested,
+                yes,
+            } => {
+                let scope = scope.build().context("valid scope must be provided")?;
+                client.activate_role_admin(
+                    &scope,
+                    "cleaning up orphaned assignments",
+                    Duration::from_secs(5 * 60),
+                )?;
+                client.delete_orphaned_role_assignments(&scope, yes, !skip_nested)?;
+                client.delete_orphaned_eligible_role_assignments(&scope, yes, !skip_nested)?;
+            }
+            Self::OrphanedAssignments {
+                scope,
+                skip_nested,
+                yes,
+            } => {
+                let scope = scope.build().context("valid scope must be provided")?;
+                client.delete_orphaned_role_assignments(&scope, yes, !skip_nested)?;
+            }
+            Self::OrphanedEligibleAssignments {
+                scope,
+                skip_nested,
+                yes,
+            } => {
+                let scope = scope.build().context("valid scope must be provided")?;
+                client.delete_orphaned_eligible_role_assignments(&scope, yes, !skip_nested)?;
             }
         }
         Ok(())
@@ -737,12 +775,12 @@ fn main() -> Result<()> {
         }
         SubCommand::Activate { cmd } => cmd.run(&client),
         SubCommand::Deactivate { cmd } => cmd.run(&client),
-        SubCommand::Delete { cmd } => cmd.run(&client),
         SubCommand::Role { cmd } => match cmd {
             RoleSubCommand::Assignment { cmd } => cmd.run(&client),
             RoleSubCommand::Definition { cmd } => cmd.run(&client),
             RoleSubCommand::Resources { cmd } => cmd.run(&client),
         },
+        SubCommand::Cleanup { cmd } => cmd.run(&client),
         SubCommand::Readme => {
             build_readme();
             Ok(())

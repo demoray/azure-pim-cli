@@ -49,6 +49,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 const WAIT_DELAY: Duration = Duration::from_secs(5);
+const RBAC_ADMIN_ROLES: &[&str] = &["Owner", "Role Based Access Control Administrator"];
 
 #[allow(clippy::large_enum_variant)]
 pub enum ActivationResult {
@@ -713,6 +714,31 @@ impl PimClient {
         }
 
         Ok(())
+    }
+
+    pub fn activate_role_admin(
+        &self,
+        scope: &Scope,
+        justification: &str,
+        duration: Duration,
+    ) -> Result<()> {
+        let active = self.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
+
+        for entry in active {
+            if entry.scope.contains(scope) && RBAC_ADMIN_ROLES.contains(&entry.role.0.as_str()) {
+                info!("role already active: {entry:?}");
+                return Ok(());
+            }
+        }
+
+        let eligible = self.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
+        for entry in eligible {
+            if entry.scope.contains(scope) && RBAC_ADMIN_ROLES.contains(&entry.role.0.as_str()) {
+                return self.activate_role_assignment(&entry, justification, duration);
+            }
+        }
+
+        bail!("unable to find role to administrate RBAC for {scope}");
     }
 }
 
