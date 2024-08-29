@@ -23,7 +23,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use tracing::debug;
+use tracing::{debug, info};
 use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
@@ -56,6 +56,7 @@ impl Cmd {
             "az-pim"
             | "az-pim activate interactive"
             | "az-pim activate"
+            | "az-pim cleanup all"
             | "az-pim cleanup auto"
             | "az-pim cleanup orphaned-assignments"
             | "az-pim cleanup orphaned-eligible-assignments"
@@ -522,6 +523,13 @@ impl AssignmentSubCommand {
 
 #[derive(Subcommand)]
 enum CleanupSubCommand {
+    /// Delete orphaned role assignments and orphaned eligibile role assignments for all available scopes
+    All {
+        /// Always respond yes to confirmations
+        #[arg(long)]
+        yes: bool,
+    },
+
     /// Delete orphaned role assignments and orphaned eligibile role assignments
     Auto {
         #[clap(flatten)]
@@ -568,6 +576,53 @@ enum CleanupSubCommand {
 impl CleanupSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
+            Self::All { yes } => {
+                let active =
+                    client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
+                let mut total =
+                    client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
+                total.extend(active.clone());
+
+                let mut to_activate = BTreeSet::new();
+
+                let mut scopes = BTreeSet::new();
+                for role_assignment in total {
+                    if role_assignment.scope.subscription().is_none() {
+                        continue;
+                    }
+
+                    if !["Owner", "Role Based Access Control Administrator"]
+                        .contains(&role_assignment.role.0.as_str())
+                    {
+                        continue;
+                    }
+
+                    info!("checking {}", role_assignment.scope_name);
+
+                    if !active.contains(&role_assignment) {
+                        to_activate.insert(role_assignment.clone());
+                    }
+
+                    scopes.insert(role_assignment.scope);
+                }
+
+                if !to_activate.is_empty() {
+                    client.activate_role_assignment_set(
+                        &to_activate,
+                        "cleaning up orphaned resources",
+                        Duration::from_secs(60 * 60 * 8),
+                        5,
+                    )?;
+                    client.wait_for_role_activation(&to_activate, Duration::from_secs(60 * 5))?;
+                }
+
+                for scope in scopes {
+                    info!("deleting orphaned role assignments for {scope}");
+                    client.delete_orphaned_role_assignments(&scope, yes, true)?;
+                    info!("deleting orphaned eligible role assignments for {scope}");
+                    client.delete_orphaned_eligible_role_assignments(&scope, yes, true)?;
+                }
+            }
             Self::Auto {
                 scope,
                 skip_nested,
