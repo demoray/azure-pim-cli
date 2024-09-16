@@ -55,6 +55,7 @@ struct Entry {
     scope: Scope,
     id: String,
     display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     upn: Option<String>,
     object_type: ObjectType,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -69,6 +70,8 @@ fn output(data: BTreeSet<Entry>, format: &Format) -> Result<()> {
                 .quote_style(QuoteStyle::Always)
                 .from_writer(stdout());
             for mut entry in data {
+                // Ensure all fields have content such that CSV renders appropriately
+                entry.upn = Some(entry.upn.take().unwrap_or_default());
                 entry.via_group = Some(entry.via_group.take().unwrap_or_default());
                 wtr.serialize(entry)?;
             }
