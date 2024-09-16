@@ -5,7 +5,7 @@ use azure_pim_cli::{
     models::{
         assignments::Assignment,
         roles::{Role, RoleAssignment, RolesExt},
-        scope::Scope,
+        scope::{Scope, ScopeBuilder},
     },
     ListFilter, PimClient,
 };
@@ -25,7 +25,6 @@ use std::{
 };
 use tracing::{debug, info};
 use tracing_subscriber::filter::LevelFilter;
-use uuid::Uuid;
 
 // empirical testing shows we need to keep under 5 concurrent requests to keep
 // from rate limiting.  In the future, we may move to a model where we go as
@@ -906,56 +905,6 @@ impl Verbosity {
                 0 => LevelFilter::INFO,
                 1 => LevelFilter::DEBUG,
                 _ => LevelFilter::TRACE,
-            }
-        }
-    }
-}
-
-#[derive(Args)]
-#[command(about = None)]
-struct ScopeBuilder {
-    /// Specify scope at the subscription level
-    #[arg(long)]
-    subscription: Option<Uuid>,
-
-    /// Specify scope at the Resource Group level
-    ///
-    /// This argument requires `subscription` to be set.
-    #[arg(long, requires = "subscription")]
-    resource_group: Option<String>,
-
-    /// Specify scope at the Resource Provider level
-    ///
-    /// This argument requires `subscription` and `resource_group` to be set.
-    #[arg(long, requires = "resource_group")]
-    provider: Option<String>,
-
-    /// Specify the full scope directly
-    #[arg(long, conflicts_with = "subscription")]
-    scope: Option<Scope>,
-}
-
-impl ScopeBuilder {
-    fn build(self) -> Option<Scope> {
-        let Self {
-            subscription,
-            resource_group,
-            provider,
-            scope,
-        } = self;
-
-        match (subscription, resource_group, provider, scope) {
-            (Some(subscription), Some(group), Some(provider), None) => {
-                Some(Scope::from_provider(&subscription, &group, &provider))
-            }
-            (Some(subscription), Some(group), None, None) => {
-                Some(Scope::from_resource_group(&subscription, &group))
-            }
-            (Some(subscription), None, None, None) => Some(Scope::from_subscription(&subscription)),
-            (None, None, None, Some(scope)) => Some(scope),
-            (None, None, None, None) => None,
-            _ => {
-                unreachable!("invalid combination of arguments provided");
             }
         }
     }
