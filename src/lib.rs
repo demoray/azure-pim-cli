@@ -12,7 +12,7 @@ mod activate;
 mod az_cli;
 mod backend;
 mod expiring;
-mod graph;
+pub mod graph;
 pub mod interactive;
 mod latest;
 pub mod models;
@@ -22,7 +22,7 @@ use crate::{
     activate::check_error_response,
     backend::Backend,
     expiring::ExpiringMap,
-    graph::{get_objects_by_ids, Object},
+    graph::{get_objects_by_ids, group_members, Object},
     models::{
         assignments::{Assignment, Assignments},
         definitions::{Definition, Definitions},
@@ -84,7 +84,8 @@ impl ListFilter {
 
 pub struct PimClient {
     backend: Backend,
-    object_cache: Mutex<ExpiringMap<String, Object>>,
+    object_cache: Mutex<ExpiringMap<String, Option<Object>>>,
+    group_cache: Mutex<ExpiringMap<String, BTreeSet<Object>>>,
     role_definitions_cache: Mutex<ExpiringMap<Scope, Vec<Definition>>>,
 }
 
@@ -92,10 +93,12 @@ impl PimClient {
     pub fn new() -> Result<Self> {
         let backend = Backend::new();
         let object_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
+        let group_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
         let role_definitions_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
         Ok(Self {
             backend,
             object_cache,
+            group_cache,
             role_definitions_cache,
         })
     }
@@ -739,6 +742,10 @@ impl PimClient {
         }
 
         bail!("unable to find role to administrate RBAC for {scope}");
+    }
+
+    pub fn group_members(&self, id: &str) -> Result<BTreeSet<Object>> {
+        group_members(self, id)
     }
 }
 
