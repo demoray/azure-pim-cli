@@ -6,7 +6,6 @@ use std::process::Command;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub(crate) enum TokenScope {
     Management,
-    #[allow(dead_code)]
     Graph,
 }
 
