@@ -22,7 +22,7 @@ cargo clippy ${BUILD_COMMON} --tests --all-targets --all-features -- -D warnings
 cargo fmt --check
 cargo build ${BUILD_COMMON}
 cargo test ${BUILD_COMMON}
-cargo run ${BUILD_COMMON} -- readme > README.md
+cargo run ${BUILD_COMMON} --bin az-pim -- readme > README.md
 git diff --exit-code README.md
 
 if [[ ${BUILD_TARGET} == "x86_64-unknown-linux-gnu" ]]; then
