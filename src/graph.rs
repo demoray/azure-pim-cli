@@ -1,32 +1,30 @@
 use crate::{az_cli::TokenScope, PimClient};
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
+use rayon::prelude::*;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use tracing::info;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
 pub struct Object {
     pub id: String,
     pub display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upn: Option<String>,
+    pub object_type: ObjectType,
 }
 
-fn get_objects_by_ids_small(pim_client: &PimClient, ids: &[&&str]) -> Result<Vec<Object>> {
-    let builder = pim_client
-        .backend
-        .client
-        .request(
-            Method::POST,
-            "https://graph.microsoft.com/v1.0/directoryObjects/getByIds",
-        )
-        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph)?);
+#[derive(Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
+pub enum ObjectType {
+    User,
+    Group,
+    ServicePrincipal,
+}
 
-    let body = serde_json::json!({ "ids": ids });
-    let request = builder.json(&body).build()?;
-    let value = pim_client.backend.retry_request(&request, None)?;
-
-    let mut results = vec![];
+fn parse_objects(value: &Value) -> Result<BTreeSet<Object>> {
+    let mut results = BTreeSet::new();
     if let Some(values) = value.get("value").and_then(|x| x.as_array()) {
         for value in values {
             let Some(id) = value
@@ -50,15 +48,47 @@ fn get_objects_by_ids_small(pim_client: &PimClient, ids: &[&&str]) -> Result<Vec
                 .and_then(|v| v.as_str())
                 .map(ToString::to_string);
 
-            results.push(Object {
+            let data_type = value
+                .get("@odata.type")
+                .map(|x| x.as_str().unwrap_or(""))
+                .context("missing @odata.type")?;
+
+            let object_type = match data_type {
+                "#microsoft.graph.user" => ObjectType::User,
+                "#microsoft.graph.group" => ObjectType::Group,
+                "#microsoft.graph.servicePrincipal" => ObjectType::ServicePrincipal,
+                _ => {
+                    bail!("unknown object type: {} - {value:#?}", data_type);
+                }
+            };
+            results.insert(Object {
                 id,
                 display_name,
                 upn,
+                object_type,
             });
         }
     }
 
     Ok(results)
+}
+
+fn get_objects_by_ids_small(pim_client: &PimClient, ids: &[&&str]) -> Result<BTreeSet<Object>> {
+    info!("checking {} objects", ids.len());
+    let builder = pim_client
+        .backend
+        .client
+        .request(
+            Method::POST,
+            "https://graph.microsoft.com/v1.0/directoryObjects/getByIds",
+        )
+        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph)?);
+
+    let body = serde_json::json!({ "ids": ids });
+    let request = builder.json(&body).build()?;
+    let value = pim_client.backend.retry_request(&request, None)?;
+
+    parse_objects(&value)
 }
 
 pub(crate) fn get_objects_by_ids(
@@ -71,19 +101,57 @@ pub(crate) fn get_objects_by_ids(
         .filter(|id| !cache.contains_key(**id))
         .collect::<Vec<_>>();
 
-    let mut result = BTreeMap::new();
+    let chunks = to_update.chunks(50).collect::<Vec<_>>();
 
-    for chunk in to_update.chunks(50) {
-        for entry in get_objects_by_ids_small(pim_client, chunk)? {
-            cache.insert(entry.id.clone(), entry);
+    let results = chunks
+        .into_par_iter()
+        .map(|chunk| get_objects_by_ids_small(pim_client, chunk))
+        .collect::<Vec<_>>();
+    for entries in results {
+        for entry in entries? {
+            cache.insert(entry.id.clone(), Some(entry));
         }
     }
 
+    let mut result = BTreeMap::new();
     for id in ids {
-        if let Some(entry) = cache.get(id) {
-            result.insert(entry.id.clone(), entry.clone());
+        if let Some(entry) = cache.get(id).cloned() {
+            if let Some(entry) = entry {
+                result.insert(entry.id.clone(), entry);
+            }
+        } else {
+            cache.insert(id.to_string(), None);
         }
     }
 
     Ok(result)
+}
+
+pub(crate) fn group_members(pim_client: &PimClient, id: &str) -> Result<BTreeSet<Object>> {
+    let mut group_cache = pim_client.group_cache.lock();
+    if let Some(entries) = group_cache.get(id) {
+        return Ok(entries.clone());
+    }
+
+    let mut cache = pim_client.object_cache.lock();
+
+    let url = format!("https://graph.microsoft.com/v1.0/groups/{id}/members");
+    let request = pim_client
+        .backend
+        .client
+        .request(Method::GET, &url)
+        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph)?)
+        .build()?;
+    let value = pim_client.backend.retry_request(&request, None)?;
+    let results = parse_objects(&value)?;
+
+    for object in &results {
+        if cache.get(&object.id).is_none() {
+            cache.insert(object.id.clone(), Some(object.clone()));
+        }
+    }
+
+    group_cache.insert(id.to_string(), results.clone());
+
+    Ok(results)
 }
