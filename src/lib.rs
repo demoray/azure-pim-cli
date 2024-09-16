@@ -22,7 +22,7 @@ use crate::{
     activate::check_error_response,
     backend::Backend,
     expiring::ExpiringMap,
-    graph::{get_objects_by_ids, group_members, Object},
+    graph::{get_objects_by_ids, group_members, Object, ObjectType},
     models::{
         assignments::{Assignment, Assignments},
         definitions::{Definition, Definitions},
@@ -744,8 +744,31 @@ impl PimClient {
         bail!("unable to find role to administrate RBAC for {scope}");
     }
 
-    pub fn group_members(&self, id: &str) -> Result<BTreeSet<Object>> {
-        group_members(self, id)
+    pub fn group_members(&self, id: &str, nested: bool) -> Result<BTreeSet<Object>> {
+        if !nested {
+            return group_members(self, id);
+        }
+
+        let mut results = BTreeSet::new();
+        let mut todo = [id.to_string()].into_iter().collect::<BTreeSet<_>>();
+        let mut done = BTreeSet::new();
+
+        while let Some(id) = todo.pop_first() {
+            if done.contains(&id) {
+                continue;
+            }
+            done.insert(id.clone());
+
+            let group_results = group_members(self, &id)?;
+            todo.extend(
+                group_results
+                    .iter()
+                    .filter(|x| matches!(x.object_type, ObjectType::Group))
+                    .map(|x| x.id.clone()),
+            );
+            results.extend(group_results);
+        }
+        Ok(results)
     }
 }
 
