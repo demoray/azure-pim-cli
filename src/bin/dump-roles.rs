@@ -8,7 +8,7 @@ use azure_pim_cli::{
     },
     ListFilter, PimClient,
 };
-use clap::{ArgAction, Args, Parser};
+use clap::{ArgAction, Args, CommandFactory, Parser};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::{
@@ -39,6 +39,26 @@ struct Cmd {
     expand: bool,
 }
 
+impl Cmd {
+    pub fn build() -> Result<Self> {
+        let help = r#"Examples:
+# Find users that have an assignment but don't start with "sc-"
+$ dump-roles --subscription 00000000-0000-0000-0000-000000000000 --expand-groups | jq '[.[]| select(.principal_type | contains("User"))] | [.[]| select(.upn | ascii_downcase | contains("sc-") | not)]'
+
+# Find users that can elevate to Owner
+$ dump-roles --subscription 00000000-0000-0000-0000-000000000000 --expand-groups --eligible | jq '[.[]| select(.principal_type | contains("User"))] | [.[] | select(.role | contains("Owner"))]'
+"#;
+
+        let mut result = Cmd::command();
+        result = result.after_long_help(help);
+
+        let mut matches = result.get_matches();
+        Ok(<Self as clap::FromArgMatches>::from_arg_matches_mut(
+            &mut matches,
+        )?)
+    }
+}
+
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Entry {
     role: Role,
@@ -59,7 +79,7 @@ fn main() -> Result<()> {
         nested,
         active,
         expand,
-    } = Cmd::parse();
+    } = Cmd::build()?;
 
     let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
         x
