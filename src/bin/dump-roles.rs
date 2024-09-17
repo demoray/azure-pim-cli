@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use azure_pim_cli::{
     check_latest_version,
-    graph::ObjectType,
+    graph::PrincipalType,
     models::{
         roles::{Role, RoleAssignment},
         scope::{Scope, ScopeBuilder},
@@ -57,7 +57,7 @@ struct Entry {
     display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     upn: Option<String>,
-    object_type: ObjectType,
+    principal_type: PrincipalType,
     #[serde(skip_serializing_if = "Option::is_none")]
     via_group: Option<String>,
 }
@@ -145,7 +145,7 @@ fn main() -> Result<()> {
                 id: object.id,
                 display_name: object.display_name,
                 upn: object.upn,
-                object_type: object.object_type,
+                principal_type: object.object_type,
                 scope: scope.clone(),
                 via_group: None,
             });
@@ -155,7 +155,7 @@ fn main() -> Result<()> {
     if expand {
         let mut expanded = BTreeSet::new();
         for entry in &results {
-            if entry.object_type != ObjectType::Group {
+            if entry.principal_type != PrincipalType::Group {
                 continue;
             }
 
@@ -166,7 +166,7 @@ fn main() -> Result<()> {
                     id: member.id,
                     display_name: member.display_name,
                     upn: member.upn,
-                    object_type: member.object_type,
+                    principal_type: member.object_type,
                     scope: entry.scope.clone(),
                     via_group: Some(entry.display_name.clone()),
                 });
