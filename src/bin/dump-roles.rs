@@ -39,7 +39,7 @@ struct Cmd {
     expand: bool,
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct Entry {
     role: Role,
     scope: Scope,
@@ -50,6 +50,12 @@ struct Entry {
     principal_type: PrincipalType,
     #[serde(skip_serializing_if = "Option::is_none")]
     via_group: Option<String>,
+}
+
+impl Entry {
+    fn is_dominated(&self, other: &Self) -> bool {
+        self.id == other.id && self.role == other.role && other.scope.contains(&self.scope)
+    }
 }
 
 fn main() -> Result<()> {
@@ -144,6 +150,8 @@ fn main() -> Result<()> {
         results.extend(expanded);
     }
 
+    let results = remove_dominated_scopes(results);
+
     serde_json::to_writer_pretty(stdout(), &results)?;
     Ok(())
 }
@@ -171,5 +179,60 @@ impl Verbosity {
                 _ => LevelFilter::TRACE,
             }
         }
+    }
+}
+
+fn remove_dominated_scopes(data: BTreeSet<Entry>) -> BTreeSet<Entry> {
+    let mut results = BTreeSet::new();
+    let mut rest = BTreeSet::new();
+
+    for entry in data {
+        if entry.scope.is_subscription() {
+            results.insert(entry);
+        } else {
+            rest.insert(entry);
+        }
+    }
+
+    for entry in rest {
+        if !results.iter().any(|x| entry.is_dominated(x)) {
+            results.insert(entry);
+        }
+    }
+
+    results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+    #[test]
+    fn remove_dominated() {
+        let base = Entry {
+            scope: Scope::from_subscription(&Uuid::nil()),
+            role: Role("Contributor".to_string()),
+            id: "1".to_string(),
+            display_name: "User 1".to_string(),
+            upn: Some("wut".to_string()),
+            principal_type: PrincipalType::User,
+            via_group: None,
+        };
+
+        let mut dominated = base.clone();
+        dominated.scope = Scope::from_resource_group(&Uuid::nil(), "rg");
+        let mut other_user = dominated.clone();
+        other_user.id = "2".to_string();
+
+        let entries = [base.clone(), dominated.clone(), other_user.clone()]
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+
+        println!("before {entries:#?}");
+        let results = remove_dominated_scopes(entries);
+        println!("after {results:#?}");
+        assert!(results.contains(&base));
+        assert!(results.contains(&other_user));
+        assert!(!results.contains(&dominated));
     }
 }
