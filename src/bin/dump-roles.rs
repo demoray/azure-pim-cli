@@ -15,7 +15,7 @@ use std::{
     collections::BTreeSet,
     io::{stderr, stdout},
 };
-use tracing::debug;
+use tracing::{debug, warn};
 use tracing_subscriber::filter::LevelFilter;
 
 /// A CLI to dump all the roles in a given scope
@@ -127,17 +127,24 @@ fn main() -> Result<()> {
         .collect();
 
     for (scope, assignments) in result {
-        for entry in assignments? {
-            let Some(object) = entry.object else { continue };
-            results.insert(Entry {
-                role: entry.role,
-                id: object.id,
-                display_name: object.display_name,
-                upn: object.upn,
-                principal_type: object.object_type,
-                scope: scope.clone(),
-                via_group: None,
-            });
+        match assignments {
+            Ok(assignments) => {
+                for entry in assignments {
+                    let Some(object) = entry.object else { continue };
+                    results.insert(Entry {
+                        role: entry.role,
+                        id: object.id,
+                        display_name: object.display_name,
+                        upn: object.upn,
+                        principal_type: object.object_type,
+                        scope: scope.clone(),
+                        via_group: None,
+                    });
+                }
+            }
+            Err(err) => {
+                warn!("error listing roles for {scope}: {err}");
+            }
         }
     }
 
