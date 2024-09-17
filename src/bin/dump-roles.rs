@@ -8,8 +8,7 @@ use azure_pim_cli::{
     },
     ListFilter, PimClient,
 };
-use clap::{ArgAction, Args, Parser, ValueEnum};
-use csv::{QuoteStyle, WriterBuilder};
+use clap::{ArgAction, Args, Parser};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::{
@@ -18,12 +17,6 @@ use std::{
 };
 use tracing::debug;
 use tracing_subscriber::filter::LevelFilter;
-
-#[derive(ValueEnum, Clone)]
-enum Format {
-    Json,
-    Csv,
-}
 
 #[derive(Parser)]
 #[command(version, disable_help_subcommand = true, name = "dump-roles")]
@@ -44,9 +37,6 @@ struct Cmd {
     /// Expand groups to include their members
     #[clap(long)]
     expand: bool,
-
-    #[clap(long, default_value = "json")]
-    format: Format,
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -62,26 +52,6 @@ struct Entry {
     via_group: Option<String>,
 }
 
-fn output(data: BTreeSet<Entry>, format: &Format) -> Result<()> {
-    match format {
-        Format::Json => serde_json::to_writer_pretty(stdout(), &data)?,
-        Format::Csv => {
-            let mut wtr = WriterBuilder::new()
-                .quote_style(QuoteStyle::Always)
-                .from_writer(stdout());
-            for mut entry in data {
-                // Ensure all fields have content such that CSV renders appropriately
-                entry.upn = Some(entry.upn.take().unwrap_or_default());
-                entry.via_group = Some(entry.via_group.take().unwrap_or_default());
-                wtr.serialize(entry)?;
-            }
-            wtr.flush()?;
-        }
-    }
-
-    Ok(())
-}
-
 fn main() -> Result<()> {
     let Cmd {
         verbose,
@@ -89,7 +59,6 @@ fn main() -> Result<()> {
         nested,
         active,
         expand,
-        format,
     } = Cmd::parse();
 
     let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -175,7 +144,8 @@ fn main() -> Result<()> {
         results.extend(expanded);
     }
 
-    output(results, &format)
+    serde_json::to_writer_pretty(stdout(), &results)?;
+    Ok(())
 }
 
 #[derive(Args)]
