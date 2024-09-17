@@ -40,31 +40,42 @@ jobs:
       if: matrix.build == 'linux-musl'
     - run: eng/build.sh ${{ matrix.target }}
       shell: bash
+
     - uses: actions/upload-artifact@v4
       if: matrix.build == 'windows'
       with:
         name: ${{ matrix.build }}
-        path: target/x86_64-pc-windows-msvc/release/az-pim.exe
+        path: |
+          target/x86_64-pc-windows-msvc/release/az-pim.exe
+          target/x86_64-pc-windows-msvc/release/dump-roles.exe
         if-no-files-found: error
+
     - uses: actions/upload-artifact@v4
       if: matrix.build == 'macos'
       with:
         name: ${{ matrix.build }}
-        path: target/aarch64-apple-darwin/release/az-pim
+        path: |
+          target/aarch64-apple-darwin/release/az-pim
+          target/aarch64-apple-darwin/release/dump-roles
         if-no-files-found: error
+
+    - uses: actions/upload-artifact@v4
+      if: matrix.build == 'linux-musl'
+      with:
+        name: ${{ matrix.build }}
+        path: |
+          target/x86_64-unknown-linux-musl/release/az-pim
+          target/x86_64-unknown-linux-musl/release/dump-roles
+        if-no-files-found: error
+
     - uses: actions/upload-artifact@v4
       if: startsWith(matrix.build, 'ubuntu-')
       with:
         name: ${{ matrix.build }}
         path: target/x86_64-unknown-linux-gnu/debian/*.deb
         if-no-files-found: error
-    - uses: actions/upload-artifact@v4
-      if: matrix.build == 'linux-musl'
-      with:
-        name: ${{ matrix.build }}
-        path: target/x86_64-unknown-linux-musl/release/az-pim
-        if-no-files-found: error
-  
+
+
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: build
@@ -93,9 +104,12 @@ jobs:
         run: |
           set -ex
           mv artifacts/macos/az-pim artifacts/macos/az-pim-macos-${VERSION}
+          mv artifacts/macos/dump-roles artifacts/macos/dump-roles-macos-${VERSION}
           mv artifacts/windows/az-pim.exe artifacts/windows/az-pim-windows-${VERSION}.exe
+          mv artifacts/windows/dump-roles.exe artifacts/windows/dump-roles-windows-${VERSION}.exe
           mv artifacts/linux-musl/az-pim artifacts/linux-musl/az-pim-linux-musl-${VERSION}
-          for ubuntu_rev in 22.04 24.04; do
+          mv artifacts/linux-musl/dump-roles artifacts/linux-musl/dump-roles-linux-musl-${VERSION}
+          for ubuntu_rev in 24.04; do
             for file in artifacts/ubuntu-${ubuntu_rev}/*.deb; do
               mv "$file" "${file%.deb}_${ubuntu_rev}.deb"
             done
