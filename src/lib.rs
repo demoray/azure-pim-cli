@@ -532,15 +532,48 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn eligible_child_resources(&self, scope: &Scope) -> Result<BTreeSet<ChildResource>> {
-        info!("listing eligible child resources for {scope}");
-        let value = self
-            .backend
-            .request(Method::GET, Operation::EligibleChildResources)
-            .scope(scope.clone())
-            .send()
-            .context("unable to list eligible child resources")?;
-        ChildResource::parse(&value)
+    pub fn eligible_child_resources(
+        &self,
+        scope: &Scope,
+        nested: bool,
+    ) -> Result<BTreeSet<ChildResource>> {
+        let mut todo = [scope.clone()].into_iter().collect::<BTreeSet<_>>();
+        let mut seen = BTreeSet::new();
+        let mut result = BTreeSet::new();
+
+        while !todo.is_empty() {
+            seen.extend(todo.clone());
+            let iteration: Vec<Result<Result<BTreeSet<ChildResource>>>> = todo
+                .into_par_iter()
+                .map(|scope| {
+                    info!("listing eligible child resources for {scope}");
+                    self.backend
+                        .request(Method::GET, Operation::EligibleChildResources)
+                        .scope(scope.clone())
+                        .send()
+                        .with_context(|| {
+                            format!("unable to list eligible child resources for {scope}")
+                        })
+                        .map(|x| {
+                            ChildResource::parse(&x).with_context(|| {
+                                format!("unable to parse eligible child resources for {scope}")
+                            })
+                        })
+                })
+                .collect();
+
+            todo = BTreeSet::new();
+            for entry in iteration {
+                for child in entry?? {
+                    if nested && !seen.contains(&child.id) {
+                        todo.insert(child.id.clone());
+                    }
+                    result.insert(child);
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     /// List role definitions available at the target scope
@@ -633,19 +666,21 @@ impl PimClient {
         answer_yes: bool,
         nested: bool,
     ) -> Result<()> {
-        let mut scopes: BTreeSet<_> = [scope.clone()].into();
-
-        if nested {
-            let resources = self.eligible_child_resources(scope)?;
-            scopes.extend(resources.into_iter().map(|x| x.id));
-        }
+        let scopes = if nested {
+            self.eligible_child_resources(scope, nested)?
+                .into_iter()
+                .map(|x| x.id)
+                .collect::<BTreeSet<_>>()
+        } else {
+            [scope.clone()].into_iter().collect()
+        };
 
         for scope in scopes {
             let definitions = self.role_definitions(&scope)?;
 
             let mut objects = self
                 .role_assignments(&scope)
-                .context("unable to list active assignments")?;
+                .with_context(|| format!("unable to list role assignments at {scope}"))?;
             debug!("{} total entries", objects.len());
             objects.retain(|x| x.object.is_none());
             debug!("{} orphaned entries", objects.len());
@@ -678,13 +713,14 @@ impl PimClient {
         answer_yes: bool,
         nested: bool,
     ) -> Result<()> {
-        let mut scopes: BTreeSet<_> = [scope.clone()].into();
-
-        if nested {
-            let resources = self.eligible_child_resources(scope)?;
-            scopes.extend(resources.into_iter().map(|x| x.id));
-        }
-
+        let scopes = if nested {
+            self.eligible_child_resources(scope, nested)?
+                .into_iter()
+                .map(|x| x.id)
+                .collect::<BTreeSet<_>>()
+        } else {
+            [scope.clone()].into_iter().collect()
+        };
         for scope in scopes {
             let definitions = self.role_definitions(&scope)?;
             for entry in self.list_eligible_role_assignments(Some(scope), None)? {

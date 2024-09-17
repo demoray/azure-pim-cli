@@ -683,15 +683,19 @@ enum ResourcesSubCommand {
     List {
         #[clap(flatten)]
         scope: ScopeBuilder,
+
+        /// Do not check for nested assignments
+        #[arg(long)]
+        skip_nested: bool,
     },
 }
 
 impl ResourcesSubCommand {
     fn run(self, client: &PimClient) -> Result<()> {
         match self {
-            Self::List { scope } => {
+            Self::List { scope, skip_nested } => {
                 let scope = scope.build().context("valid scope must be provided")?;
-                output(&client.eligible_child_resources(&scope)?)?;
+                output(&client.eligible_child_resources(&scope, !skip_nested)?)?;
             }
         }
         Ok(())
