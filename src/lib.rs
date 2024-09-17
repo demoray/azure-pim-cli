@@ -22,7 +22,7 @@ use crate::{
     activate::check_error_response,
     backend::Backend,
     expiring::ExpiringMap,
-    graph::{get_objects_by_ids, group_members, Object, ObjectType},
+    graph::{get_objects_by_ids, group_members, Object, PrincipalType},
     models::{
         assignments::{Assignment, Assignments},
         definitions::{Definition, Definitions},
@@ -209,9 +209,9 @@ impl PimClient {
 
         let response = builder
             .send()
-            .context("unable to list active assignments")?;
+            .context("unable to list active role assignments")?;
         let mut results = RoleAssignment::parse(&response, with_principal)
-            .context("unable to parse active assignments")?;
+            .context("unable to parse active role assignments")?;
 
         if with_principal {
             let ids = results
@@ -513,8 +513,9 @@ impl PimClient {
             .request(Method::GET, Operation::RoleAssignments)
             .scope(scope.clone())
             .send()
-            .context("unable to list assignments")?;
-        let assignments: Assignments = serde_json::from_value(value)?;
+            .with_context(|| format!("unable to list role assignments at {scope}"))?;
+        let assignments: Assignments = serde_json::from_value(value)
+            .with_context(|| format!("unable to parse role assignment response at {scope}"))?;
         let mut assignments = assignments.value;
         let ids = assignments
             .iter()
@@ -532,15 +533,48 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn eligible_child_resources(&self, scope: &Scope) -> Result<BTreeSet<ChildResource>> {
-        info!("listing eligible child resources for {scope}");
-        let value = self
-            .backend
-            .request(Method::GET, Operation::EligibleChildResources)
-            .scope(scope.clone())
-            .send()
-            .context("unable to list eligible child resources")?;
-        ChildResource::parse(&value)
+    pub fn eligible_child_resources(
+        &self,
+        scope: &Scope,
+        nested: bool,
+    ) -> Result<BTreeSet<ChildResource>> {
+        let mut todo = [scope.clone()].into_iter().collect::<BTreeSet<_>>();
+        let mut seen = BTreeSet::new();
+        let mut result = BTreeSet::new();
+
+        while !todo.is_empty() {
+            seen.extend(todo.clone());
+            let iteration: Vec<Result<Result<BTreeSet<ChildResource>>>> = todo
+                .into_par_iter()
+                .map(|scope| {
+                    info!("listing eligible child resources for {scope}");
+                    self.backend
+                        .request(Method::GET, Operation::EligibleChildResources)
+                        .scope(scope.clone())
+                        .send()
+                        .with_context(|| {
+                            format!("unable to list eligible child resources for {scope}")
+                        })
+                        .map(|x| {
+                            ChildResource::parse(&x).with_context(|| {
+                                format!("unable to parse eligible child resources for {scope}")
+                            })
+                        })
+                })
+                .collect();
+
+            todo = BTreeSet::new();
+            for entry in iteration {
+                for child in entry?? {
+                    if nested && !seen.contains(&child.id) {
+                        todo.insert(child.id.clone());
+                    }
+                    result.insert(child);
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     /// List role definitions available at the target scope
@@ -562,8 +596,9 @@ impl PimClient {
             .request(Method::GET, Operation::RoleDefinitions)
             .scope(scope.clone())
             .send()
-            .context("unable to list role definitions")?;
-        let definitions: Definitions = serde_json::from_value(definitions)?;
+            .with_context(|| format!("unable to list role definitions at {scope}"))?;
+        let definitions: Definitions = serde_json::from_value(definitions)
+            .with_context(|| format!("unable to parse role definitions at {scope}"))?;
         cache.insert(scope.clone(), definitions.value.clone());
 
         Ok(definitions.value)
@@ -580,7 +615,7 @@ impl PimClient {
             .extra(format!("/{assignment_name}"))
             .scope(scope.clone())
             .send()
-            .context("unable to delete assignment")?;
+            .with_context(|| format!("unable to delete assignment {assignment_name} at {scope}"))?;
         Ok(())
     }
 
@@ -623,7 +658,10 @@ impl PimClient {
             .scope(scope.clone())
             .json(body)
             .validate(check_error_response)
-            .send()?;
+            .send()
+            .with_context(|| {
+                format!("unable to delete role definition {role_definition_id} for {principal_id}")
+            })?;
         Ok(())
     }
 
@@ -633,19 +671,21 @@ impl PimClient {
         answer_yes: bool,
         nested: bool,
     ) -> Result<()> {
-        let mut scopes: BTreeSet<_> = [scope.clone()].into();
-
-        if nested {
-            let resources = self.eligible_child_resources(scope)?;
-            scopes.extend(resources.into_iter().map(|x| x.id));
-        }
+        let scopes = if nested {
+            self.eligible_child_resources(scope, nested)?
+                .into_iter()
+                .map(|x| x.id)
+                .collect::<BTreeSet<_>>()
+        } else {
+            [scope.clone()].into_iter().collect()
+        };
 
         for scope in scopes {
             let definitions = self.role_definitions(&scope)?;
 
             let mut objects = self
                 .role_assignments(&scope)
-                .context("unable to list active assignments")?;
+                .with_context(|| format!("unable to list role assignments at {scope}"))?;
             debug!("{} total entries", objects.len());
             objects.retain(|x| x.object.is_none());
             debug!("{} orphaned entries", objects.len());
@@ -678,13 +718,14 @@ impl PimClient {
         answer_yes: bool,
         nested: bool,
     ) -> Result<()> {
-        let mut scopes: BTreeSet<_> = [scope.clone()].into();
-
-        if nested {
-            let resources = self.eligible_child_resources(scope)?;
-            scopes.extend(resources.into_iter().map(|x| x.id));
-        }
-
+        let scopes = if nested {
+            self.eligible_child_resources(scope, nested)?
+                .into_iter()
+                .map(|x| x.id)
+                .collect::<BTreeSet<_>>()
+        } else {
+            [scope.clone()].into_iter().collect()
+        };
         for scope in scopes {
             let definitions = self.role_definitions(&scope)?;
             for entry in self.list_eligible_role_assignments(Some(scope), None)? {
@@ -763,7 +804,7 @@ impl PimClient {
             todo.extend(
                 group_results
                     .iter()
-                    .filter(|x| matches!(x.object_type, ObjectType::Group))
+                    .filter(|x| matches!(x.object_type, PrincipalType::Group))
                     .map(|x| x.id.clone()),
             );
             results.extend(group_results);

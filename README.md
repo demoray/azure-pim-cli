@@ -798,6 +798,9 @@ Options:
       --scope <SCOPE>
           Specify the full scope directly
 
+      --skip-nested
+          Do not check for nested assignments
+
   -h, --help
           Print help (see a summary with '-h')
 
