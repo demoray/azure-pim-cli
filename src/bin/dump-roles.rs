@@ -18,6 +18,7 @@ use std::{
 use tracing::debug;
 use tracing_subscriber::filter::LevelFilter;
 
+/// A CLI to dump all the roles in a given scope
 #[derive(Parser)]
 #[command(version, disable_help_subcommand = true, name = "dump-roles")]
 struct Cmd {
@@ -27,16 +28,13 @@ struct Cmd {
     #[clap(flatten)]
     scope: ScopeBuilder,
 
+    /// Show role assignments that are eligibile to be activated rather than active assignments
     #[clap(long)]
-    active: bool,
-
-    /// Include nested scopes
-    #[clap(long)]
-    nested: bool,
+    eligible: bool,
 
     /// Expand groups to include their members
     #[clap(long)]
-    expand: bool,
+    expand_groups: bool,
 }
 
 impl Cmd {
@@ -82,9 +80,8 @@ fn main() -> Result<()> {
     let Cmd {
         verbose,
         scope,
-        nested,
-        active,
-        expand,
+        eligible,
+        expand_groups,
     } = Cmd::build()?;
 
     let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -108,25 +105,22 @@ fn main() -> Result<()> {
     let scope = scope.build().context("scope required")?;
     let client = PimClient::new()?;
 
-    let mut scopes = [scope.clone()].into_iter().collect::<BTreeSet<_>>();
-    if nested {
-        scopes.extend(
-            client
-                .eligible_child_resources(&scope, true)?
-                .into_iter()
-                .map(|x| x.id),
-        );
-    }
+    let mut scopes = client
+        .eligible_child_resources(&scope, true)?
+        .into_iter()
+        .map(|x| x.id)
+        .collect::<BTreeSet<_>>();
+    scopes.insert(scope);
 
     let mut results = BTreeSet::new();
     let result: Vec<(Scope, Result<BTreeSet<RoleAssignment>>)> = scopes
         .into_par_iter()
         .map(|scope| {
-            let entries = if active {
-                client.list_active_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
-            } else {
+            let entries = if eligible {
                 client
                     .list_eligible_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
+            } else {
+                client.list_active_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
             };
             (scope.clone(), entries)
         })
@@ -147,7 +141,7 @@ fn main() -> Result<()> {
         }
     }
 
-    if expand {
+    if expand_groups {
         let mut expanded = BTreeSet::new();
         for entry in &results {
             if entry.principal_type != PrincipalType::Group {
