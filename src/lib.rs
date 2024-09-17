@@ -209,9 +209,9 @@ impl PimClient {
 
         let response = builder
             .send()
-            .context("unable to list active assignments")?;
+            .context("unable to list active role assignments")?;
         let mut results = RoleAssignment::parse(&response, with_principal)
-            .context("unable to parse active assignments")?;
+            .context("unable to parse active role assignments")?;
 
         if with_principal {
             let ids = results
@@ -513,8 +513,9 @@ impl PimClient {
             .request(Method::GET, Operation::RoleAssignments)
             .scope(scope.clone())
             .send()
-            .context("unable to list assignments")?;
-        let assignments: Assignments = serde_json::from_value(value)?;
+            .with_context(|| format!("unable to list role assignments at {scope}"))?;
+        let assignments: Assignments = serde_json::from_value(value)
+            .with_context(|| format!("unable to parse role assignment response at {scope}"))?;
         let mut assignments = assignments.value;
         let ids = assignments
             .iter()
@@ -595,8 +596,9 @@ impl PimClient {
             .request(Method::GET, Operation::RoleDefinitions)
             .scope(scope.clone())
             .send()
-            .context("unable to list role definitions")?;
-        let definitions: Definitions = serde_json::from_value(definitions)?;
+            .with_context(|| format!("unable to list role definitions at {scope}"))?;
+        let definitions: Definitions = serde_json::from_value(definitions)
+            .with_context(|| format!("unable to parse role definitions at {scope}"))?;
         cache.insert(scope.clone(), definitions.value.clone());
 
         Ok(definitions.value)
@@ -613,7 +615,7 @@ impl PimClient {
             .extra(format!("/{assignment_name}"))
             .scope(scope.clone())
             .send()
-            .context("unable to delete assignment")?;
+            .with_context(|| format!("unable to delete assignment {assignment_name} at {scope}"))?;
         Ok(())
     }
 
@@ -656,7 +658,10 @@ impl PimClient {
             .scope(scope.clone())
             .json(body)
             .validate(check_error_response)
-            .send()?;
+            .send()
+            .with_context(|| {
+                format!("unable to delete role definition {role_definition_id} for {principal_id}")
+            })?;
         Ok(())
     }
 
