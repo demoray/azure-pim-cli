@@ -86,7 +86,7 @@ fn main() -> Result<()> {
     if nested {
         scopes.extend(
             client
-                .eligible_child_resources(&scope)?
+                .eligible_child_resources(&scope, true)?
                 .into_iter()
                 .map(|x| x.id),
         );
