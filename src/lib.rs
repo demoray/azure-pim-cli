@@ -22,7 +22,7 @@ use crate::{
     activate::check_error_response,
     backend::Backend,
     expiring::ExpiringMap,
-    graph::{get_objects_by_ids, group_members, Object, ObjectType},
+    graph::{get_objects_by_ids, group_members, Object, PrincipalType},
     models::{
         assignments::{Assignment, Assignments},
         definitions::{Definition, Definitions},
@@ -763,7 +763,7 @@ impl PimClient {
             todo.extend(
                 group_results
                     .iter()
-                    .filter(|x| matches!(x.object_type, ObjectType::Group))
+                    .filter(|x| matches!(x.object_type, PrincipalType::Group))
                     .map(|x| x.id.clone()),
             );
             results.extend(group_results);

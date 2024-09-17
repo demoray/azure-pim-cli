@@ -13,11 +13,11 @@ pub struct Object {
     pub display_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upn: Option<String>,
-    pub object_type: ObjectType,
+    pub object_type: PrincipalType,
 }
 
 #[derive(Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq, Debug, Clone)]
-pub enum ObjectType {
+pub enum PrincipalType {
     User,
     Group,
     ServicePrincipal,
@@ -54,9 +54,9 @@ fn parse_objects(value: &Value) -> Result<BTreeSet<Object>> {
                 .context("missing @odata.type")?;
 
             let object_type = match data_type {
-                "#microsoft.graph.user" => ObjectType::User,
-                "#microsoft.graph.group" => ObjectType::Group,
-                "#microsoft.graph.servicePrincipal" => ObjectType::ServicePrincipal,
+                "#microsoft.graph.user" => PrincipalType::User,
+                "#microsoft.graph.group" => PrincipalType::Group,
+                "#microsoft.graph.servicePrincipal" => PrincipalType::ServicePrincipal,
                 _ => {
                     bail!("unknown object type: {} - {value:#?}", data_type);
                 }
