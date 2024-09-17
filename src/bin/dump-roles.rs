@@ -39,7 +39,7 @@ struct Cmd {
     expand: bool,
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct Entry {
     role: Role,
     scope: Scope,
@@ -50,6 +50,12 @@ struct Entry {
     principal_type: PrincipalType,
     #[serde(skip_serializing_if = "Option::is_none")]
     via_group: Option<String>,
+}
+
+impl Entry {
+    fn is_dominated(&self, other: &Self) -> bool {
+        self.id == other.id && self.role == other.role && other.scope.contains(&self.scope)
+    }
 }
 
 fn main() -> Result<()> {
