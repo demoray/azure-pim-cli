@@ -45,39 +45,27 @@ jobs:
       if: matrix.build == 'windows'
       with:
         name: ${{ matrix.build }}
-        path: target/x86_64-pc-windows-msvc/release/az-pim.exe
-        if-no-files-found: error
-    - uses: actions/upload-artifact@v4
-      if: matrix.build == 'windows'
-      with:
-        name: ${{ matrix.build }}
-        path: target/x86_64-pc-windows-msvc/release/dump-roles.exe
+        path: |
+          target/x86_64-pc-windows-msvc/release/az-pim.exe
+          target/x86_64-pc-windows-msvc/release/dump-roles.exe
         if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
       if: matrix.build == 'macos'
       with:
         name: ${{ matrix.build }}
-        path: target/aarch64-apple-darwin/release/az-pim
-        if-no-files-found: error
-    - uses: actions/upload-artifact@v4
-      if: matrix.build == 'macos'
-      with:
-        name: ${{ matrix.build }}
-        path: target/aarch64-apple-darwin/release/dump-roles
+        path: |
+          target/aarch64-apple-darwin/release/az-pim
+          target/aarch64-apple-darwin/release/dump-roles
         if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
       if: matrix.build == 'linux-musl'
       with:
         name: ${{ matrix.build }}
-        path: target/x86_64-unknown-linux-musl/release/az-pim
-        if-no-files-found: error
-    - uses: actions/upload-artifact@v4
-      if: matrix.build == 'linux-musl'
-      with:
-        name: ${{ matrix.build }}
-        path: target/x86_64-unknown-linux-musl/release/dump-roles
+        path: |
+          target/x86_64-unknown-linux-musl/release/az-pim
+          target/x86_64-unknown-linux-musl/release/dump-roles
         if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
