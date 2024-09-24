@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
@@ -303,6 +303,7 @@ impl ActivateSubCommand {
                 wait,
             } => {
                 let set = build_set(client, config, role, false)?;
+                ensure!(!set.is_empty(), "no roles to activate");
                 client.activate_role_assignment_set(
                     &set,
                     &justification,
