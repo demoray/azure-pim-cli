@@ -20,7 +20,7 @@ home = "0.5"
 humantime = "2.1"
 itertools = "0.13"
 parking_lot = "0.12"
-ratatui = { version = "0.28", features = ["crossterm"] }
+ratatui = { version = "0.29", features = ["crossterm"] }
 rayon = "1.10"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 retry = "2.0"
@@ -30,7 +30,7 @@ serde_json = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.10", features = ["v7"] }
+uuid = { version = "1.11", features = ["v7"] }
 
 [dev-dependencies]
 insta = { version = "1.40", features = ["json"] }

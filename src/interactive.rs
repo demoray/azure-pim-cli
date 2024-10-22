@@ -274,7 +274,7 @@ impl App {
                     .style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))
                     .height(1),
             )
-            .highlight_style(if self.input_state == InputState::Scopes {
+            .row_highlight_style(if self.input_state == InputState::Scopes {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
                 Style::default()
