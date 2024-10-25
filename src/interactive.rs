@@ -258,7 +258,11 @@ impl App {
                             if data.enabled { ENABLED } else { DISABLED },
                             data.value.role
                         ),
-                        format!("{}\n{}", data.value.scope_name, data.value.scope),
+                        if let Some(scope_name) = data.value.scope_name.as_deref() {
+                            format!("{scope_name}\n{}", data.value.scope)
+                        } else {
+                            data.value.scope.to_string()
+                        },
                     ])
                     .height(ITEM_HEIGHT)
                 }),
@@ -397,7 +401,7 @@ fn column_widths(items: &BTreeSet<RoleAssignment>) -> Result<(u16, u16)> {
             .iter()
             .fold((0, 0, 0), |(scope_name_len, role_len, scope_len), x| {
                 (
-                    scope_name_len.max(x.scope_name.len()),
+                    scope_name_len.max(x.scope_name.as_deref().map_or(0, str::len)),
                     role_len.max(x.role.0.len()),
                     scope_len.max(x.scope.0.len()),
                 )
