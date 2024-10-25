@@ -597,7 +597,11 @@ impl CleanupSubCommand {
                         continue;
                     }
 
-                    info!("checking {}", role_assignment.scope_name);
+                    if let Some(scope_name) = role_assignment.scope_name.as_ref() {
+                        info!("checking {scope_name}");
+                    } else {
+                        info!("checking {}", role_assignment.scope.to_string());
+                    }
 
                     if !active.contains(&role_assignment) {
                         to_activate.insert(role_assignment.clone());

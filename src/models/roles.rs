@@ -63,7 +63,8 @@ impl RolesExt for BTreeSet<RoleAssignment> {
 pub struct RoleAssignment {
     pub role: Role,
     pub scope: Scope,
-    pub scope_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_name: Option<String>,
     #[serde(skip)]
     pub role_definition_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,10 +77,11 @@ pub struct RoleAssignment {
 
 impl RoleAssignment {
     pub(crate) fn friendly(&self) -> String {
-        format!(
-            "\"{}\" in \"{}\" ({})",
-            self.role, self.scope_name, self.scope
-        )
+        if let Some(scope_name) = self.scope_name.as_ref() {
+            format!("\"{}\" in \"{}\" ({})", self.role, scope_name, self.scope)
+        } else {
+            format!("\"{}\" in {}", self.role, self.scope)
+        }
     }
 
     // NOTE: serde_json doesn't panic on failed index slicing, it returns a Value
@@ -107,13 +109,9 @@ impl RoleAssignment {
                 bail!("no scope id: {entry:#?}");
             };
 
-            let Some(scope_name) = entry["properties"]["expandedProperties"]["scope"]
-                ["displayName"]
+            let scope_name = entry["properties"]["expandedProperties"]["scope"]["displayName"]
                 .as_str()
-                .map(ToString::to_string)
-            else {
-                bail!("no scope name: {entry:#?}");
-            };
+                .map(ToString::to_string);
 
             let Some(role_definition_id) = entry["properties"]["roleDefinitionId"]
                 .as_str()

@@ -252,7 +252,11 @@ impl PimClient {
             principal_type: _,
             object: _,
         } = assignment;
-        info!("extending {role} in {scope_name} ({scope})");
+        if let Some(scope_name) = scope_name {
+            info!("extending {role} in {scope_name} ({scope})");
+        } else {
+            info!("extending {role} in {scope}");
+        }
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
@@ -298,7 +302,11 @@ impl PimClient {
             principal_type: _,
             object: _,
         } = assignment;
-        info!("activating {role} in {scope_name} ({scope})");
+        if let Some(scope_name) = scope_name {
+            info!("activating {role} in {scope_name} ({scope})");
+        } else {
+            info!("activating {role} in {scope}");
+        }
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
@@ -388,7 +396,11 @@ impl PimClient {
             principal_type: _,
             object: _,
         } = assignment;
-        info!("deactivating {role} in {scope_name} ({scope})");
+        if let Some(scope_name) = scope_name {
+            info!("deactivating {role} in {scope_name} ({scope})");
+        } else {
+            info!("deactivating {role} in {scope}");
+        }
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
@@ -637,7 +649,7 @@ impl PimClient {
         } = assignment;
 
         let principal_id = principal_id.as_deref().context("missing principal id")?;
-        info!("deleting {role} in {scope_name} ({scope})");
+        info!("deleting {role} in {scope_name:?} ({scope})");
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
@@ -745,7 +757,10 @@ impl PimClient {
                         .as_str()),
                     entry.principal_id.clone().unwrap_or_default(),
                     entry.principal_type.clone().unwrap_or_default(),
-                    entry.scope_name.clone()
+                    entry
+                        .scope_name
+                        .clone()
+                        .unwrap_or_else(|| entry.scope.to_string())
                 );
                 if !answer_yes && !confirm(&format!("delete {value}")) {
                     info!("skipping {value}");
