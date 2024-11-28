@@ -133,7 +133,7 @@ impl PimClient {
         scope: Option<Scope>,
         filter: Option<ListFilter>,
     ) -> Result<BTreeSet<RoleAssignment>> {
-        let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
+        let with_principal = filter.as_ref() != Some(&ListFilter::AsTarget);
         if let Some(scope) = &scope {
             info!("listing eligible assignments for {scope}");
         } else {
@@ -187,7 +187,7 @@ impl PimClient {
         scope: Option<Scope>,
         filter: Option<ListFilter>,
     ) -> Result<BTreeSet<RoleAssignment>> {
-        let with_principal = filter.as_ref().map_or(true, |x| x != &ListFilter::AsTarget);
+        let with_principal = filter.as_ref() != Some(&ListFilter::AsTarget);
 
         if let Some(scope) = &scope {
             info!("listing active role assignments in {scope}");
