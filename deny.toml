@@ -15,11 +15,6 @@ multiple-versions = "allow"
 
 [licenses]
 allow = ["Apache-2.0", "BSD-3-Clause", "BSL-1.0", "MIT", "Unicode-3.0", "Zlib"]
-exceptions = [
-  { allow = [
-    "Unicode-DFS-2016",
-  ], name = "unicode-ident", version = "*" },
-]
 version = 2
 
 [licenses.private]
