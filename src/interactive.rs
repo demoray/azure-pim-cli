@@ -123,7 +123,7 @@ impl App {
 
     fn check(&mut self) {
         self.warnings.clear();
-        if self.justification.as_ref().map_or(false, String::is_empty) {
+        if self.justification.as_ref().is_some_and(String::is_empty) {
             self.warnings.push("Justification is required".to_string());
         }
         if self.items.iter().all(|x| !x.enabled) {

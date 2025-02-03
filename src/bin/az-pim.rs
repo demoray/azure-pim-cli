@@ -379,6 +379,7 @@ enum DeactivateSubCommand {
         ///     ]
         /// `
         config: Option<PathBuf>,
+
         #[clap(
             long,
             conflicts_with = "config",
@@ -386,7 +387,6 @@ enum DeactivateSubCommand {
             value_parser = parse_key_val::<Role, Scope>,
             action = clap::ArgAction::Append
         )]
-
         /// Specify a role to deactivate
         ///
         /// Specify multiple times to include multiple key/value pairs
