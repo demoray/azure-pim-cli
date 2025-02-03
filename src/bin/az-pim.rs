@@ -229,11 +229,11 @@ enum ActivateSubCommand {
         /// Specify multiple times to include multiple key/value pairs
         role: Option<Vec<(Role, Scope)>>,
 
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         /// Concurrency rate
         ///
         /// Specify how many roles to activate concurrently.  This can be used to
         /// speed up activation of roles.
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
 
         #[clap(long)]
@@ -249,11 +249,11 @@ enum ActivateSubCommand {
         /// Justification for the request
         justification: Option<String>,
 
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         /// Concurrency rate
         ///
         /// Specify how many roles to activate concurrently.  This can be used to
         /// speed up activation of roles.
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
 
         #[clap(long, default_value = DEFAULT_DURATION)]
@@ -392,20 +392,20 @@ enum DeactivateSubCommand {
         /// Specify multiple times to include multiple key/value pairs
         role: Option<Vec<(Role, Scope)>>,
 
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         /// Concurrency rate
         ///
         /// Specify how many roles to deactivate concurrently.  This can be used to
         /// speed up activation of roles.
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
     },
     /// Deactivate roles interactively
     Interactive {
+        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         /// Concurrency rate
         ///
         /// Specify how many roles to deactivate concurrently.  This can be used to
         /// speed up deactivation of roles.
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
         concurrency: usize,
     },
 }
@@ -535,12 +535,12 @@ enum CleanupSubCommand {
         #[clap(flatten)]
         scope: ScopeBuilder,
 
-        /// Do not check for nested assignments
         #[arg(long)]
+        /// Do not check for nested assignments
         skip_nested: bool,
 
-        /// Always respond yes to confirmations
         #[arg(long)]
+        /// Always respond yes to confirmations
         yes: bool,
     },
 
@@ -549,12 +549,12 @@ enum CleanupSubCommand {
         #[clap(flatten)]
         scope: ScopeBuilder,
 
-        /// Do not check for nested assignments
         #[arg(long)]
+        /// Do not check for nested assignments
         skip_nested: bool,
 
-        /// Always respond yes to confirmations
         #[arg(long)]
+        /// Always respond yes to confirmations
         yes: bool,
     },
 
@@ -563,12 +563,12 @@ enum CleanupSubCommand {
         #[clap(flatten)]
         scope: ScopeBuilder,
 
-        /// Do not check for nested assignments
         #[arg(long)]
+        /// Do not check for nested assignments
         skip_nested: bool,
 
-        /// Always respond yes to confirmations
         #[arg(long)]
+        /// Always respond yes to confirmations
         yes: bool,
     },
 }
@@ -689,8 +689,8 @@ enum ResourcesSubCommand {
         #[clap(flatten)]
         scope: ScopeBuilder,
 
-        /// Do not check for nested assignments
         #[arg(long)]
+        /// Do not check for nested assignments
         skip_nested: bool,
     },
 }
