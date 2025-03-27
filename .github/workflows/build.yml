@@ -31,10 +31,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    - run: rustup update
+    - run: rustup add ${[ matrix.target ]}
+      if: ${{ matrix.target }}
+    - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
+    - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3
       with:
-        targets: ${{ matrix.target }}
-    - uses: Swatinem/rust-cache@v2
+        crate: cargo-deny
+    - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3
+      with:
+        crate: typos-cli
+    - uses: baptiste0928/cargo-install@91c5da15570085bcde6f4d7aed98cb82d6769fd3
+      with:
+        crate: cargo-deb
+      if: matrix.build == 'ubuntu-24.04'
     - run: sudo apt-get install -y --no-install-recommends musl-tools
       shell: bash
       if: matrix.build == 'linux-musl'
