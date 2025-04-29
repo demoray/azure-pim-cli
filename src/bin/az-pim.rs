@@ -17,6 +17,7 @@ use std::{
     cmp::min,
     collections::BTreeSet,
     error::Error,
+    fmt::Write,
     fs::{read, File},
     io::{stderr, stdout},
     path::PathBuf,
@@ -725,7 +726,7 @@ where
     }
 }
 
-fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
+fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> Result<String> {
     let mut readme = String::new();
     let current = cmd.get_name().to_string();
 
@@ -746,30 +747,27 @@ fn build_readme_entry(cmd: &mut Command, mut names: Vec<String>) -> String {
     }
 
     let long_help = cmd.render_long_help().to_string().replace("```", "\n```\n");
-    readme.push_str(&format!(" {name}\n\n```\n{long_help}\n```\n",));
+    write!(readme, " {name}\n\n```\n{long_help}\n```\n")?;
 
     if let Some(example) = Cmd::example(&name) {
         for _ in 0..=depth {
             readme.push('#');
         }
-        readme.push_str(&format!(
-            " Example Usage\n\n```\n{}\n```\n\n",
-            example.trim()
-        ));
+        write!(readme, " Example Usage\n\n```\n{}\n```\n\n", example.trim())?;
     }
 
     for cmd in cmd.get_subcommands_mut() {
         if cmd.get_name() == "readme" {
             continue;
         }
-        readme.push_str(&build_readme_entry(cmd, names.clone()));
+        readme.push_str(&build_readme_entry(cmd, names.clone())?);
     }
-    readme
+    Ok(readme)
 }
 
-fn build_readme() {
+fn build_readme() -> Result<()> {
     let mut cmd = Cmd::command();
-    let readme = build_readme_entry(&mut cmd, Vec::new())
+    let readme = build_readme_entry(&mut cmd, Vec::new())?
         .replacen(
             "# az-pim",
             &format!("# Azure PIM CLI\n\n{}", env!("CARGO_PKG_DESCRIPTION")),
@@ -781,6 +779,7 @@ fn build_readme() {
         .join("\n")
         .replace("\n\n\n", "\n");
     print!("{readme}");
+    Ok(())
 }
 
 pub(crate) fn output<T>(value: &T) -> Result<()>
@@ -844,10 +843,7 @@ fn main() -> Result<()> {
             RoleSubCommand::Resources { cmd } => cmd.run(&client),
         },
         SubCommand::Cleanup { cmd } => cmd.run(&client),
-        SubCommand::Readme => {
-            build_readme();
-            Ok(())
-        }
+        SubCommand::Readme => build_readme(),
         SubCommand::Init { shell } => {
             Cmd::shell_completion(shell);
             Ok(())
