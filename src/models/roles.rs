@@ -32,7 +32,6 @@ pub trait RolesExt {
 }
 
 impl RolesExt for &BTreeSet<RoleAssignment> {
-    #[must_use]
     fn find_role(&self, role: &Role, scope: &Scope) -> Option<RoleAssignment> {
         let role = role.0.to_lowercase();
         self.iter()
@@ -49,7 +48,6 @@ impl RolesExt for &BTreeSet<RoleAssignment> {
 }
 
 impl RolesExt for BTreeSet<RoleAssignment> {
-    #[must_use]
     fn find_role(&self, role: &Role, scope: &Scope) -> Option<RoleAssignment> {
         (&self).find_role(role, scope)
     }
