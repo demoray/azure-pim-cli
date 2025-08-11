@@ -167,7 +167,7 @@ impl Backend {
         retry(retries, operation).map_err(|e| e.error)
     }
 
-    pub(crate) fn request(&self, method: Method, operation: Operation) -> RequestBuilder {
+    pub(crate) fn request(&self, method: Method, operation: Operation) -> RequestBuilder<'_> {
         RequestBuilder::new(self, method, operation)
     }
 }
