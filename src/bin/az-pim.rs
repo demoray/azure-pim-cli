@@ -27,11 +27,6 @@ use std::{
 use tracing::{debug, info};
 use tracing_subscriber::filter::LevelFilter;
 
-// empirical testing shows we need to keep under 5 concurrent requests to keep
-// from rate limiting.  In the future, we may move to a model where we go as
-// fast as possible and only slow down once Azure says to do so.
-const DEFAULT_CONCURRENCY: usize = 4;
-
 const DEFAULT_DURATION: &str = "8 hours";
 
 #[derive(Parser)]
@@ -230,13 +225,6 @@ enum ActivateSubCommand {
         /// Specify multiple times to include multiple key/value pairs
         role: Option<Vec<(Role, Scope)>>,
 
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
-        /// Concurrency rate
-        ///
-        /// Specify how many roles to activate concurrently.  This can be used to
-        /// speed up activation of roles.
-        concurrency: usize,
-
         #[clap(long)]
         /// Duration to wait for the roles to be activated
         ///
@@ -249,13 +237,6 @@ enum ActivateSubCommand {
         #[clap(long)]
         /// Justification for the request
         justification: Option<String>,
-
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
-        /// Concurrency rate
-        ///
-        /// Specify how many roles to activate concurrently.  This can be used to
-        /// speed up activation of roles.
-        concurrency: usize,
 
         #[clap(long, default_value = DEFAULT_DURATION)]
         /// Duration for the role to be active
@@ -272,7 +253,7 @@ enum ActivateSubCommand {
 }
 
 impl ActivateSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
+    async fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::Role {
                 role,
@@ -283,16 +264,21 @@ impl ActivateSubCommand {
             } => {
                 let roles = client
                     .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await
                     .context("unable to list eligible assignments")?;
                 let scope = scope.build().context("valid scope must be provided")?;
                 let entry = roles
                     .find_role(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
-                client.activate_role_assignment(&entry, &justification, duration.into())?;
+                client
+                    .activate_role_assignment(&entry, &justification, duration.into())
+                    .await?;
 
                 if let Some(wait) = wait {
                     let assignments = [entry].into();
-                    client.wait_for_role_activation(&assignments, wait.into())?;
+                    client
+                        .wait_for_role_activation(&assignments, wait.into())
+                        .await?;
                 }
             }
             Self::Set {
@@ -300,30 +286,26 @@ impl ActivateSubCommand {
                 role,
                 justification,
                 duration,
-                concurrency,
                 wait,
             } => {
-                let set = build_set(client, config, role, false)?;
+                let set = build_set(client, config, role, false).await?;
                 ensure!(!set.is_empty(), "no roles to activate");
-                client.activate_role_assignment_set(
-                    &set,
-                    &justification,
-                    duration.into(),
-                    concurrency,
-                )?;
+                client
+                    .activate_role_assignment_set(&set, &justification, duration.into())
+                    .await?;
 
                 if let Some(wait) = wait {
-                    client.wait_for_role_activation(&set, wait.into())?;
+                    client.wait_for_role_activation(&set, wait.into()).await?;
                 }
             }
             Self::Interactive {
                 justification,
-                concurrency,
                 duration,
                 wait,
             } => {
-                let roles =
-                    client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
+                let roles = client
+                    .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await?;
                 if let Some(Selected {
                     assignments,
                     justification,
@@ -334,15 +316,14 @@ impl ActivateSubCommand {
                     Some(duration.as_secs() / 60),
                 )? {
                     let duration = Duration::from_secs(duration * 60);
-                    client.activate_role_assignment_set(
-                        &assignments,
-                        &justification,
-                        duration,
-                        concurrency,
-                    )?;
+                    client
+                        .activate_role_assignment_set(&assignments, &justification, duration)
+                        .await?;
 
                     if let Some(wait) = wait {
-                        client.wait_for_role_activation(&assignments, wait.into())?;
+                        client
+                            .wait_for_role_activation(&assignments, wait.into())
+                            .await?;
                     }
                 }
             }
@@ -392,49 +373,33 @@ enum DeactivateSubCommand {
         ///
         /// Specify multiple times to include multiple key/value pairs
         role: Option<Vec<(Role, Scope)>>,
-
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
-        /// Concurrency rate
-        ///
-        /// Specify how many roles to deactivate concurrently.  This can be used to
-        /// speed up activation of roles.
-        concurrency: usize,
     },
     /// Deactivate roles interactively
-    Interactive {
-        #[clap(long, default_value_t = DEFAULT_CONCURRENCY)]
-        /// Concurrency rate
-        ///
-        /// Specify how many roles to deactivate concurrently.  This can be used to
-        /// speed up deactivation of roles.
-        concurrency: usize,
-    },
+    Interactive {},
 }
 
 impl DeactivateSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
+    async fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::Role { role, scope } => {
                 let scope = scope.build().context("valid scope must be provided")?;
                 let roles = client
                     .list_active_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await
                     .context("unable to list active assignments")?;
                 let entry = roles.find_role(&role, &scope).context("role not found")?;
-                client.deactivate_role_assignment(&entry)?;
+                client.deactivate_role_assignment(&entry).await?;
             }
-            Self::Set {
-                config,
-                role,
-                concurrency,
-            } => {
-                let set = build_set(client, config, role, true)?;
-                client.deactivate_role_assignment_set(&set, concurrency)?;
+            Self::Set { config, role } => {
+                let set = build_set(client, config, role, true).await?;
+                client.deactivate_role_assignment_set(&set).await?;
             }
-            Self::Interactive { concurrency } => {
-                let roles =
-                    client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
+            Self::Interactive {} => {
+                let roles = client
+                    .list_active_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await?;
                 if let Some(Selected { assignments, .. }) = interactive_ui(roles, None, None)? {
-                    client.deactivate_role_assignment_set(&assignments, concurrency)?;
+                    client.deactivate_role_assignment_set(&assignments).await?;
                 }
             }
         }
@@ -489,12 +454,13 @@ enum AssignmentSubCommand {
 }
 
 impl AssignmentSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
+    async fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::List { scope } => {
                 let scope = scope.build().context("valid scope must be provided")?;
                 let objects = client
                     .role_assignments(&scope)
+                    .await
                     .context("unable to list active assignments")?;
                 output(&objects)?;
             }
@@ -505,6 +471,7 @@ impl AssignmentSubCommand {
                 let scope = scope.build().context("valid scope must be provided")?;
                 client
                     .delete_role_assignment(&scope, &assignment_name)
+                    .await
                     .context("unable to delete assignment")?;
             }
             Self::DeleteSet { config } => {
@@ -514,6 +481,7 @@ impl AssignmentSubCommand {
                 for entry in entries {
                     client
                         .delete_role_assignment(&entry.properties.scope, &entry.name)
+                        .await
                         .context("unable to delete assignment")?;
                 }
             }
@@ -575,13 +543,15 @@ enum CleanupSubCommand {
 }
 
 impl CleanupSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
+    async fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::All { yes } => {
-                let active =
-                    client.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
-                let mut total =
-                    client.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
+                let active = client
+                    .list_active_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await?;
+                let mut total = client
+                    .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await?;
                 total.extend(active.clone());
 
                 let mut to_activate = BTreeSet::new();
@@ -612,20 +582,27 @@ impl CleanupSubCommand {
                 }
 
                 if !to_activate.is_empty() {
-                    client.activate_role_assignment_set(
-                        &to_activate,
-                        "cleaning up orphaned resources",
-                        Duration::from_secs(60 * 60 * 8),
-                        5,
-                    )?;
-                    client.wait_for_role_activation(&to_activate, Duration::from_secs(60 * 5))?;
+                    client
+                        .activate_role_assignment_set(
+                            &to_activate,
+                            "cleaning up orphaned resources",
+                            Duration::from_secs(60 * 60 * 8),
+                        )
+                        .await?;
+                    client
+                        .wait_for_role_activation(&to_activate, Duration::from_secs(60 * 5))
+                        .await?;
                 }
 
                 for scope in scopes {
                     info!("deleting orphaned role assignments for {scope}");
-                    client.delete_orphaned_role_assignments(&scope, yes, true)?;
+                    client
+                        .delete_orphaned_role_assignments(&scope, yes, true)
+                        .await?;
                     info!("deleting orphaned eligible role assignments for {scope}");
-                    client.delete_orphaned_eligible_role_assignments(&scope, yes, true)?;
+                    client
+                        .delete_orphaned_eligible_role_assignments(&scope, yes, true)
+                        .await?;
                 }
             }
             Self::Auto {
@@ -634,13 +611,19 @@ impl CleanupSubCommand {
                 yes,
             } => {
                 let scope = scope.build().context("valid scope must be provided")?;
-                client.activate_role_admin(
-                    &scope,
-                    "cleaning up orphaned assignments",
-                    Duration::from_secs(5 * 60),
-                )?;
-                client.delete_orphaned_role_assignments(&scope, yes, !skip_nested)?;
-                client.delete_orphaned_eligible_role_assignments(&scope, yes, !skip_nested)?;
+                client
+                    .activate_role_admin(
+                        &scope,
+                        "cleaning up orphaned assignments",
+                        Duration::from_secs(5 * 60),
+                    )
+                    .await?;
+                client
+                    .delete_orphaned_role_assignments(&scope, yes, !skip_nested)
+                    .await?;
+                client
+                    .delete_orphaned_eligible_role_assignments(&scope, yes, !skip_nested)
+                    .await?;
             }
             Self::OrphanedAssignments {
                 scope,
@@ -648,7 +631,9 @@ impl CleanupSubCommand {
                 yes,
             } => {
                 let scope = scope.build().context("valid scope must be provided")?;
-                client.delete_orphaned_role_assignments(&scope, yes, !skip_nested)?;
+                client
+                    .delete_orphaned_role_assignments(&scope, yes, !skip_nested)
+                    .await?;
             }
             Self::OrphanedEligibleAssignments {
                 scope,
@@ -656,7 +641,9 @@ impl CleanupSubCommand {
                 yes,
             } => {
                 let scope = scope.build().context("valid scope must be provided")?;
-                client.delete_orphaned_eligible_role_assignments(&scope, yes, !skip_nested)?;
+                client
+                    .delete_orphaned_eligible_role_assignments(&scope, yes, !skip_nested)
+                    .await?;
             }
         }
         Ok(())
@@ -672,11 +659,11 @@ enum DefinitionSubCommand {
     },
 }
 impl DefinitionSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
+    async fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::List { scope } => {
                 let scope = scope.build().context("valid scope must be provided")?;
-                output(&client.role_definitions(&scope)?)?;
+                output(&client.role_definitions(&scope).await?)?;
             }
         }
         Ok(())
@@ -697,11 +684,15 @@ enum ResourcesSubCommand {
 }
 
 impl ResourcesSubCommand {
-    fn run(self, client: &PimClient) -> Result<()> {
+    async fn run(self, client: &PimClient) -> Result<()> {
         match self {
             Self::List { scope, skip_nested } => {
                 let scope = scope.build().context("valid scope must be provided")?;
-                output(&client.eligible_child_resources(&scope, !skip_nested)?)?;
+                output(
+                    &client
+                        .eligible_child_resources(&scope, !skip_nested)
+                        .await?,
+                )?;
             }
         }
         Ok(())
@@ -798,7 +789,8 @@ struct ElevateEntry {
 #[derive(Deserialize)]
 struct Roles(Vec<ElevateEntry>);
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Cmd::parse();
 
     let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -815,7 +807,7 @@ fn main() -> Result<()> {
         .try_init()
         .ok();
 
-    if let Err(err) = check_latest_version() {
+    if let Err(err) = check_latest_version().await {
         debug!("unable to check latest version: {err}");
     }
 
@@ -829,20 +821,24 @@ fn main() -> Result<()> {
         } => {
             let scope = scope.build();
             let roles = if active {
-                client.list_active_role_assignments(scope, Some(filter))?
+                client
+                    .list_active_role_assignments(scope, Some(filter))
+                    .await?
             } else {
-                client.list_eligible_role_assignments(scope, Some(filter))?
+                client
+                    .list_eligible_role_assignments(scope, Some(filter))
+                    .await?
             };
             output(&roles)
         }
-        SubCommand::Activate { cmd } => cmd.run(&client),
-        SubCommand::Deactivate { cmd } => cmd.run(&client),
+        SubCommand::Activate { cmd } => cmd.run(&client).await,
+        SubCommand::Deactivate { cmd } => cmd.run(&client).await,
         SubCommand::Role { cmd } => match cmd {
-            RoleSubCommand::Assignment { cmd } => cmd.run(&client),
-            RoleSubCommand::Definition { cmd } => cmd.run(&client),
-            RoleSubCommand::Resources { cmd } => cmd.run(&client),
+            RoleSubCommand::Assignment { cmd } => cmd.run(&client).await,
+            RoleSubCommand::Definition { cmd } => cmd.run(&client).await,
+            RoleSubCommand::Resources { cmd } => cmd.run(&client).await,
         },
-        SubCommand::Cleanup { cmd } => cmd.run(&client),
+        SubCommand::Cleanup { cmd } => cmd.run(&client).await,
         SubCommand::Readme => build_readme(),
         SubCommand::Init { shell } => {
             Cmd::shell_completion(shell);
@@ -851,7 +847,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn build_set(
+async fn build_set(
     client: &PimClient,
     config: Option<PathBuf>,
     role: Option<Vec<(Role, Scope)>>,
@@ -871,10 +867,12 @@ fn build_set(
     let assignments = if active {
         client
             .list_active_role_assignments(None, Some(ListFilter::AsTarget))
+            .await
             .context("unable to list active assignments in PIM")?
     } else {
         client
             .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
+            .await
             .context("unable to list available assignments in PIM")?
     };
 

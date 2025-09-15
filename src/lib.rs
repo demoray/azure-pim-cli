@@ -34,17 +34,15 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use backend::Operation;
 use clap::ValueEnum;
-use parking_lot::Mutex;
-use rayon::{prelude::*, ThreadPoolBuilder};
 use reqwest::Method;
 use std::{
     collections::BTreeSet,
     fmt::{Display, Formatter, Result as FmtResult},
     io::stdin,
-    sync::Once,
     thread::sleep,
     time::{Duration, Instant},
 };
+use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -103,32 +101,20 @@ impl PimClient {
         })
     }
 
-    pub fn clear_cache(&self) {
-        self.object_cache.lock().clear();
-        self.role_definitions_cache.lock().clear();
+    pub async fn clear_cache(&self) {
+        self.object_cache.lock().await.clear();
+        self.role_definitions_cache.lock().await.clear();
     }
 
-    pub fn current_user(&self) -> Result<String> {
-        self.backend.principal_id()
-    }
-
-    fn thread_builder(concurrency: usize) {
-        static ONCE: Once = Once::new();
-        ONCE.call_once(|| {
-            if let Err(err) = ThreadPoolBuilder::new()
-                .num_threads(concurrency)
-                .build_global()
-            {
-                warn!("thread pool failed to build: {err}");
-            }
-        });
+    pub async fn current_user(&self) -> Result<String> {
+        self.backend.principal_id().await
     }
 
     /// List the roles available to the current user
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn list_eligible_role_assignments(
+    pub async fn list_eligible_role_assignments(
         &self,
         scope: Option<Scope>,
         filter: Option<ListFilter>,
@@ -153,6 +139,7 @@ impl PimClient {
 
         let response = builder
             .send()
+            .await
             .context("unable to list eligible assignments")?;
         let mut results = RoleAssignment::parse(&response, with_principal)
             .context("unable to parse eligible assignments")?;
@@ -163,7 +150,9 @@ impl PimClient {
                 .filter_map(|x| x.principal_id.as_deref())
                 .collect::<BTreeSet<_>>();
 
-            let objects = get_objects_by_ids(self, ids).context("getting objects by id")?;
+            let objects = get_objects_by_ids(self, ids)
+                .await
+                .context("getting objects by id")?;
             results = results
                 .into_iter()
                 .map(|mut x| {
@@ -182,7 +171,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn list_active_role_assignments(
+    pub async fn list_active_role_assignments(
         &self,
         scope: Option<Scope>,
         filter: Option<ListFilter>,
@@ -209,6 +198,7 @@ impl PimClient {
 
         let response = builder
             .send()
+            .await
             .context("unable to list active role assignments")?;
         let mut results = RoleAssignment::parse(&response, with_principal)
             .context("unable to parse active role assignments")?;
@@ -219,7 +209,9 @@ impl PimClient {
                 .filter_map(|x| x.principal_id.as_deref())
                 .collect::<BTreeSet<_>>();
 
-            let objects = get_objects_by_ids(self, ids).context("getting objects by id")?;
+            let objects = get_objects_by_ids(self, ids)
+                .await
+                .context("getting objects by id")?;
             results = results
                 .into_iter()
                 .map(|mut x| {
@@ -237,7 +229,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn extend_role_assignment(
+    pub async fn extend_role_assignment(
         &self,
         assignment: &RoleAssignment,
         justification: &str,
@@ -260,7 +252,7 @@ impl PimClient {
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
-                "principalId": self.backend.principal_id()?,
+                "principalId": self.backend.principal_id().await?,
                 "roleDefinitionId": role_definition_id,
                 "requestType": "SelfExtend",
                 "justification": justification,
@@ -279,7 +271,8 @@ impl PimClient {
             .scope(scope.clone())
             .json(body)
             .validate(check_error_response)
-            .send()?;
+            .send()
+            .await?;
         Ok(())
     }
 
@@ -287,7 +280,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn activate_role_assignment(
+    pub async fn activate_role_assignment(
         &self,
         assignment: &RoleAssignment,
         justification: &str,
@@ -310,7 +303,7 @@ impl PimClient {
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
-                "principalId": self.backend.principal_id()?,
+                "principalId": self.backend.principal_id().await?,
                 "roleDefinitionId": role_definition_id,
                 "requestType": "SelfActivate",
                 "justification": justification,
@@ -329,37 +322,37 @@ impl PimClient {
             .scope(scope.clone())
             .json(body)
             .validate(check_error_response)
-            .send()?;
+            .send()
+            .await?;
 
         Ok(())
     }
 
-    pub fn activate_role_assignment_set(
+    pub async fn activate_role_assignment_set(
         &self,
         assignments: &BTreeSet<RoleAssignment>,
         justification: &str,
         duration: Duration,
-        concurrency: usize,
     ) -> Result<()> {
         ensure!(!assignments.is_empty(), "no roles specified");
 
-        Self::thread_builder(concurrency);
+        let results = assignments.iter().map(|x| async {
+            let result = self
+                .activate_role_assignment(x, justification, duration)
+                .await;
+            match result {
+                Ok(()) => ActivationResult::Success,
+                Err(error) => {
+                    error!(
+                        "scope: {} definition: {} error: {error:?}",
+                        x.scope, x.role_definition_id
+                    );
+                    ActivationResult::Failed(x.clone())
+                }
+            }
+        });
 
-        let results = assignments
-            .into_par_iter()
-            .map(
-                |entry| match self.activate_role_assignment(entry, justification, duration) {
-                    Ok(()) => ActivationResult::Success,
-                    Err(error) => {
-                        error!(
-                            "scope: {} definition: {} error: {error:?}",
-                            entry.scope, entry.role_definition_id
-                        );
-                        ActivationResult::Failed(entry.clone())
-                    }
-                },
-            )
-            .collect::<Vec<_>>();
+        let results = futures::future::join_all(results).await;
 
         let mut failed = BTreeSet::new();
 
@@ -386,7 +379,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn deactivate_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
+    pub async fn deactivate_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
         let RoleAssignment {
             scope,
             role_definition_id,
@@ -404,7 +397,7 @@ impl PimClient {
         let request_id = Uuid::now_v7();
         let body = serde_json::json!({
             "properties": {
-                "principalId": self.backend.principal_id()?,
+                "principalId": self.backend.principal_id().await?,
                 "roleDefinitionId": role_definition_id,
                 "requestType": "SelfDeactivate",
                 "justification": "Deactivation request",
@@ -417,22 +410,19 @@ impl PimClient {
             .scope(scope.clone())
             .json(body)
             .validate(check_error_response)
-            .send()?;
+            .send()
+            .await?;
         Ok(())
     }
 
-    pub fn deactivate_role_assignment_set(
+    pub async fn deactivate_role_assignment_set(
         &self,
         assignments: &BTreeSet<RoleAssignment>,
-        concurrency: usize,
     ) -> Result<()> {
         ensure!(!assignments.is_empty(), "no roles specified");
 
-        Self::thread_builder(concurrency);
-
-        let results = assignments
-            .into_par_iter()
-            .map(|entry| match self.deactivate_role_assignment(entry) {
+        let results = assignments.iter().map(|entry| async {
+            match self.deactivate_role_assignment(entry).await {
                 Ok(()) => ActivationResult::Success,
                 Err(error) => {
                     error!(
@@ -441,8 +431,9 @@ impl PimClient {
                     );
                     ActivationResult::Failed(entry.clone())
                 }
-            })
-            .collect::<Vec<_>>();
+            }
+        });
+        let results = futures::future::join_all(results).await;
 
         let mut failed = BTreeSet::new();
 
@@ -465,7 +456,7 @@ impl PimClient {
         Ok(())
     }
 
-    pub fn wait_for_role_activation(
+    pub async fn wait_for_role_activation(
         &self,
         assignments: &BTreeSet<RoleAssignment>,
         wait_timeout: Duration,
@@ -498,7 +489,9 @@ impl PimClient {
             }
             last = Some(current);
 
-            let active = self.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
+            let active = self
+                .list_active_role_assignments(None, Some(ListFilter::AsTarget))
+                .await?;
             debug!("active assignments: {active:#?}");
             waiting.retain(|entry| !active.contains(entry));
             debug!("still waiting: {waiting:#?}");
@@ -518,13 +511,14 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn role_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
+    pub async fn role_assignments(&self, scope: &Scope) -> Result<Vec<Assignment>> {
         info!("listing assignments for {scope}");
         let value = self
             .backend
             .request(Method::GET, Operation::RoleAssignments)
             .scope(scope.clone())
             .send()
+            .await
             .with_context(|| format!("unable to list role assignments at {scope}"))?;
         let assignments: Assignments = serde_json::from_value(value)
             .with_context(|| format!("unable to parse role assignment response at {scope}"))?;
@@ -534,7 +528,9 @@ impl PimClient {
             .map(|x| x.properties.principal_id.as_str())
             .collect();
 
-        let objects = get_objects_by_ids(self, ids).context("getting objects by id")?;
+        let objects = get_objects_by_ids(self, ids)
+            .await
+            .context("getting objects by id")?;
         for x in &mut assignments {
             x.object = objects.get(&x.properties.principal_id).cloned();
         }
@@ -545,7 +541,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn eligible_child_resources(
+    pub async fn eligible_child_resources(
         &self,
         scope: &Scope,
         nested: bool,
@@ -556,24 +552,23 @@ impl PimClient {
 
         while !todo.is_empty() {
             seen.extend(todo.clone());
-            let iteration: Vec<Result<Result<BTreeSet<ChildResource>>>> = todo
-                .into_par_iter()
-                .map(|scope| {
-                    info!("listing eligible child resources for {scope}");
-                    self.backend
-                        .request(Method::GET, Operation::EligibleChildResources)
-                        .scope(scope.clone())
-                        .send()
-                        .with_context(|| {
-                            format!("unable to list eligible child resources for {scope}")
+            // let iteration: Vec<Result<Result<BTreeSet<ChildResource>>>> = todo
+            let iteration = todo.iter().map(|scope| async {
+                let scope = scope.clone();
+                info!("listing eligible child resources for {scope}");
+                self.backend
+                    .request(Method::GET, Operation::EligibleChildResources)
+                    .scope(scope.clone())
+                    .send()
+                    .await
+                    .with_context(|| format!("unable to list eligible child resources for {scope}"))
+                    .map(|x| {
+                        ChildResource::parse(&x).with_context(|| {
+                            format!("unable to parse eligible child resources for {scope}")
                         })
-                        .map(|x| {
-                            ChildResource::parse(&x).with_context(|| {
-                                format!("unable to parse eligible child resources for {scope}")
-                            })
-                        })
-                })
-                .collect();
+                    })
+            });
+            let iteration = futures::future::join_all(iteration).await;
 
             todo = BTreeSet::new();
             for entry in iteration {
@@ -595,8 +590,8 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn role_definitions(&self, scope: &Scope) -> Result<Vec<Definition>> {
-        let mut cache = self.role_definitions_cache.lock();
+    pub async fn role_definitions(&self, scope: &Scope) -> Result<Vec<Definition>> {
+        let mut cache = self.role_definitions_cache.lock().await;
 
         if let Some(cached) = cache.get(scope) {
             return Ok(cached.clone());
@@ -608,6 +603,7 @@ impl PimClient {
             .request(Method::GET, Operation::RoleDefinitions)
             .scope(scope.clone())
             .send()
+            .await
             .with_context(|| format!("unable to list role definitions at {scope}"))?;
         let definitions: Definitions = serde_json::from_value(definitions)
             .with_context(|| format!("unable to parse role definitions at {scope}"))?;
@@ -620,13 +616,14 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn delete_role_assignment(&self, scope: &Scope, assignment_name: &str) -> Result<()> {
+    pub async fn delete_role_assignment(&self, scope: &Scope, assignment_name: &str) -> Result<()> {
         info!("deleting assignment {assignment_name} from {scope}");
         self.backend
             .request(Method::DELETE, Operation::RoleAssignments)
             .extra(format!("/{assignment_name}"))
             .scope(scope.clone())
             .send()
+            .await
             .with_context(|| format!("unable to delete assignment {assignment_name} at {scope}"))?;
         Ok(())
     }
@@ -637,7 +634,7 @@ impl PimClient {
     ///
     /// # Errors
     /// Will return `Err` if the request fails or the response is not valid JSON
-    pub fn delete_eligible_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
+    pub async fn delete_eligible_role_assignment(&self, assignment: &RoleAssignment) -> Result<()> {
         let RoleAssignment {
             scope,
             role_definition_id,
@@ -671,20 +668,22 @@ impl PimClient {
             .json(body)
             .validate(check_error_response)
             .send()
+            .await
             .with_context(|| {
                 format!("unable to delete role definition {role_definition_id} for {principal_id}")
             })?;
         Ok(())
     }
 
-    pub fn delete_orphaned_role_assignments(
+    pub async fn delete_orphaned_role_assignments(
         &self,
         scope: &Scope,
         answer_yes: bool,
         nested: bool,
     ) -> Result<()> {
         let scopes = if nested {
-            self.eligible_child_resources(scope, nested)?
+            self.eligible_child_resources(scope, nested)
+                .await?
                 .into_iter()
                 .map(|x| x.id)
                 .collect::<BTreeSet<_>>()
@@ -693,10 +692,11 @@ impl PimClient {
         };
 
         for scope in scopes {
-            let definitions = self.role_definitions(&scope)?;
+            let definitions = self.role_definitions(&scope).await?;
 
             let mut objects = self
                 .role_assignments(&scope)
+                .await
                 .with_context(|| format!("unable to list role assignments at {scope}"))?;
             debug!("{} total entries", objects.len());
             objects.retain(|x| x.object.is_none());
@@ -718,20 +718,22 @@ impl PimClient {
                 }
 
                 self.delete_role_assignment(&entry.properties.scope, &entry.name)
+                    .await
                     .context("unable to delete assignment")?;
             }
         }
         Ok(())
     }
 
-    pub fn delete_orphaned_eligible_role_assignments(
+    pub async fn delete_orphaned_eligible_role_assignments(
         &self,
         scope: &Scope,
         answer_yes: bool,
         nested: bool,
     ) -> Result<()> {
         let scopes = if nested {
-            self.eligible_child_resources(scope, nested)?
+            self.eligible_child_resources(scope, nested)
+                .await?
                 .into_iter()
                 .map(|x| x.id)
                 .collect::<BTreeSet<_>>()
@@ -739,8 +741,11 @@ impl PimClient {
             [scope.clone()].into_iter().collect()
         };
         for scope in scopes {
-            let definitions = self.role_definitions(&scope)?;
-            for entry in self.list_eligible_role_assignments(Some(scope), None)? {
+            let definitions = self.role_definitions(&scope).await?;
+            for entry in self
+                .list_eligible_role_assignments(Some(scope), None)
+                .await?
+            {
                 if entry.object.is_some() {
                     continue;
                 }
@@ -768,20 +773,22 @@ impl PimClient {
                 }
                 info!("deleting {value}");
 
-                self.delete_eligible_role_assignment(&entry)?;
+                self.delete_eligible_role_assignment(&entry).await?;
             }
         }
 
         Ok(())
     }
 
-    pub fn activate_role_admin(
+    pub async fn activate_role_admin(
         &self,
         scope: &Scope,
         justification: &str,
         duration: Duration,
     ) -> Result<()> {
-        let active = self.list_active_role_assignments(None, Some(ListFilter::AsTarget))?;
+        let active = self
+            .list_active_role_assignments(None, Some(ListFilter::AsTarget))
+            .await?;
 
         for entry in active {
             if entry.scope.contains(scope) && RBAC_ADMIN_ROLES.contains(&entry.role.0.as_str()) {
@@ -790,19 +797,23 @@ impl PimClient {
             }
         }
 
-        let eligible = self.list_eligible_role_assignments(None, Some(ListFilter::AsTarget))?;
+        let eligible = self
+            .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
+            .await?;
         for entry in eligible {
             if entry.scope.contains(scope) && RBAC_ADMIN_ROLES.contains(&entry.role.0.as_str()) {
-                return self.activate_role_assignment(&entry, justification, duration);
+                return self
+                    .activate_role_assignment(&entry, justification, duration)
+                    .await;
             }
         }
 
         bail!("unable to find role to administrate RBAC for {scope}");
     }
 
-    pub fn group_members(&self, id: &str, nested: bool) -> Result<BTreeSet<Object>> {
+    pub async fn group_members(&self, id: &str, nested: bool) -> Result<BTreeSet<Object>> {
         if !nested {
-            return group_members(self, id);
+            return group_members(self, id).await;
         }
 
         let mut results = BTreeSet::new();
@@ -815,7 +826,7 @@ impl PimClient {
             }
             done.insert(id.clone());
 
-            let group_results = group_members(self, &id)?;
+            let group_results = group_members(self, &id).await?;
             todo.extend(
                 group_results
                     .iter()

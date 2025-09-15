@@ -3,13 +3,12 @@ use azure_pim_cli::{
     check_latest_version,
     graph::PrincipalType,
     models::{
-        roles::{Role, RoleAssignment},
+        roles::Role,
         scope::{Scope, ScopeBuilder},
     },
     ListFilter, PimClient,
 };
 use clap::{ArgAction, Args, CommandFactory, Parser};
-use rayon::prelude::*;
 use serde::Serialize;
 use std::{
     collections::BTreeSet,
@@ -76,7 +75,8 @@ impl Entry {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let Cmd {
         verbose,
         scope,
@@ -98,7 +98,7 @@ fn main() -> Result<()> {
         .try_init()
         .ok();
 
-    if let Err(err) = check_latest_version() {
+    if let Err(err) = check_latest_version().await {
         debug!("unable to check latest version: {err}");
     }
 
@@ -106,25 +106,27 @@ fn main() -> Result<()> {
     let client = PimClient::new()?;
 
     let mut scopes = client
-        .eligible_child_resources(&scope, true)?
+        .eligible_child_resources(&scope, true)
+        .await?
         .into_iter()
         .map(|x| x.id)
         .collect::<BTreeSet<_>>();
     scopes.insert(scope);
 
     let mut results = BTreeSet::new();
-    let result: Vec<(Scope, Result<BTreeSet<RoleAssignment>>)> = scopes
-        .into_par_iter()
-        .map(|scope| {
-            let entries = if eligible {
-                client
-                    .list_eligible_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
-            } else {
-                client.list_active_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
-            };
-            (scope.clone(), entries)
-        })
-        .collect();
+    let result = scopes.iter().map(|scope| async {
+        let entries = if eligible {
+            client
+                .list_eligible_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
+                .await
+        } else {
+            client
+                .list_active_role_assignments(Some(scope.clone()), Some(ListFilter::AtScope))
+                .await
+        };
+        (scope.clone(), entries)
+    });
+    let result = futures::future::join_all(result).await;
 
     for (scope, assignments) in result {
         match assignments {
@@ -155,7 +157,7 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            let members = client.group_members(&entry.id, true)?;
+            let members = client.group_members(&entry.id, true).await?;
             for member in members {
                 expanded.insert(Entry {
                     role: entry.role.clone(),
