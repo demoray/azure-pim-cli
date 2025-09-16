@@ -798,7 +798,7 @@ async fn main() -> Result<()> {
     } else {
         tracing_subscriber::EnvFilter::builder()
             .with_default_directive(args.verbose.get_level().into())
-            .parse("")?
+            .parse("typespec_client_core=warn")?
     };
 
     tracing_subscriber::fmt()
