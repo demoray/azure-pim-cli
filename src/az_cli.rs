@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use azure_core::credentials::TokenCredential;
-use azure_identity::{AzureCliCredential, AzureDeveloperCliCredential, TokenCredentialOptions};
+use azure_identity::{AzureCliCredential, AzureDeveloperCliCredential};
 use azure_identity_helpers::{
     azureauth_cli_credentials::AzureauthCliCredential,
-    chained_token_credential::ChainedTokenCredential,
+    chained_token_credential::ChainedTokenCredential, devicecode_credentials::DeviceCodeCredential,
 };
 use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
 use home::home_dir;
@@ -51,7 +51,7 @@ async fn read_default_tenant() -> Option<String> {
 /// # Errors
 /// Will return `Err` if the authentication fails
 pub async fn get_token(scope: TokenScope) -> Result<String> {
-    let mut provider = ChainedTokenCredential::new(Some(TokenCredentialOptions::default().into()));
+    let mut provider = ChainedTokenCredential::new(None);
     provider.add_source(AzureCliCredential::new(None)?);
     provider.add_source(AzureDeveloperCliCredential::new(None)?);
     if let Some(tenant_id) = read_default_tenant().await {
@@ -60,6 +60,10 @@ pub async fn get_token(scope: TokenScope) -> Result<String> {
             "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
         )?);
     }
+    provider.add_source(DeviceCodeCredential::new(
+        "common",
+        "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+    )?);
 
     let token = provider
         .get_token(&[scope.to_scope_endpoint()], None)
