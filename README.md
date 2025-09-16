@@ -222,13 +222,6 @@ Options:
 
           Specify multiple times to include multiple key/value pairs
 
-      --concurrency <CONCURRENCY>
-          Concurrency rate
-
-          Specify how many roles to activate concurrently.  This can be used to speed up activation of roles.
-
-          [default: 4]
-
       --wait <WAIT>
           Duration to wait for the roles to be activated
 
@@ -276,22 +269,15 @@ Options:
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
 
-      --concurrency <CONCURRENCY>
-          Concurrency rate
-
-          Specify how many roles to activate concurrently.  This can be used to speed up activation of roles.
-
-          [default: 4]
-
-      --quiet
-          Only show errors
-
       --duration <DURATION>
           Duration for the role to be active
 
           Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
 
           [default: "8 hours"]
+
+      --quiet
+          Only show errors
 
       --wait <WAIT>
           Duration to wait for the roles to be activated
@@ -395,13 +381,6 @@ Options:
 
           Specify multiple times to include multiple key/value pairs
 
-      --concurrency <CONCURRENCY>
-          Concurrency rate
-
-          Specify how many roles to deactivate concurrently.  This can be used to speed up activation of roles.
-
-          [default: 4]
-
   -h, --help
           Print help (see a summary with '-h')
 
@@ -425,13 +404,6 @@ Deactivate roles interactively
 Usage: interactive [OPTIONS]
 
 Options:
-      --concurrency <CONCURRENCY>
-          Concurrency rate
-
-          Specify how many roles to deactivate concurrently.  This can be used to speed up deactivation of roles.
-
-          [default: 4]
-
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
 
@@ -439,7 +411,7 @@ Options:
           Only show errors
 
   -h, --help
-          Print help (see a summary with '-h')
+          Print help
 
 ```
 ## az-pim role

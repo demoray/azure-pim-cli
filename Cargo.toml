@@ -9,25 +9,28 @@ license = "MIT"
 name = "azure-pim-cli"
 repository = "https://github.com/demoray/azure-pim-cli"
 version = "0.8.0"
+default-run = "az-pim"
 
 [dependencies]
 anyhow = "1.0"
+azure-identity-helpers = "0.0.8"
+azure_core = "0.27"
+azure_identity = "0.27"
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
 derive_setters = "0.1"
+exponential-backoff = "2.1.0"
+futures = "0.3.31"
 home = "0.5"
 humantime = "2.3"
-itertools = "0.14"
-parking_lot = "0.12"
 ratatui = { version = "0.29", features = ["crossterm"] }
-rayon = "1.11"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
-retry = "2.1"
+reqwest = { version = "0.12", features = ["json"] }
 semver = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+tokio = "1.47"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.18", features = ["v7"] }

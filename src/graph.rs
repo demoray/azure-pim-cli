@@ -1,6 +1,6 @@
 use crate::{az_cli::TokenScope, PimClient};
 use anyhow::{bail, Context, Result};
-use rayon::prelude::*;
+use futures::future::join_all;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -73,7 +73,10 @@ fn parse_objects(value: &Value) -> Result<BTreeSet<Object>> {
     Ok(results)
 }
 
-fn get_objects_by_ids_small(pim_client: &PimClient, ids: &[&&str]) -> Result<BTreeSet<Object>> {
+async fn get_objects_by_ids_small(
+    pim_client: &PimClient,
+    ids: &[&&str],
+) -> Result<BTreeSet<Object>> {
     info!("checking {} objects", ids.len());
     let builder = pim_client
         .backend
@@ -82,20 +85,20 @@ fn get_objects_by_ids_small(pim_client: &PimClient, ids: &[&&str]) -> Result<BTr
             Method::POST,
             "https://graph.microsoft.com/v1.0/directoryObjects/getByIds",
         )
-        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph)?);
+        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph).await?);
 
     let body = serde_json::json!({ "ids": ids });
     let request = builder.json(&body).build()?;
-    let value = pim_client.backend.retry_request(&request, None)?;
+    let value = pim_client.backend.retry_request(&request, None).await?;
 
     parse_objects(&value)
 }
 
-pub(crate) fn get_objects_by_ids(
+pub(crate) async fn get_objects_by_ids(
     pim_client: &PimClient,
     ids: BTreeSet<&str>,
 ) -> Result<BTreeMap<String, Object>> {
-    let mut cache = pim_client.object_cache.lock();
+    let mut cache = pim_client.object_cache.lock().await;
     let to_update = ids
         .iter()
         .filter(|id| !cache.contains_key(**id))
@@ -103,12 +106,15 @@ pub(crate) fn get_objects_by_ids(
 
     let chunks = to_update.chunks(50).collect::<Vec<_>>();
 
-    let results = chunks
-        .into_par_iter()
-        .map(|chunk| get_objects_by_ids_small(pim_client, chunk))
-        .collect::<Vec<_>>();
-    for entries in results {
-        for entry in entries? {
+    let results = join_all(
+        chunks
+            .iter()
+            .map(|chunk| get_objects_by_ids_small(pim_client, chunk)),
+    )
+    .await;
+
+    for entry in results {
+        for entry in entry? {
             cache.insert(entry.id.clone(), Some(entry));
         }
     }
@@ -127,22 +133,22 @@ pub(crate) fn get_objects_by_ids(
     Ok(result)
 }
 
-pub(crate) fn group_members(pim_client: &PimClient, id: &str) -> Result<BTreeSet<Object>> {
-    let mut group_cache = pim_client.group_cache.lock();
+pub(crate) async fn group_members(pim_client: &PimClient, id: &str) -> Result<BTreeSet<Object>> {
+    let mut group_cache = pim_client.group_cache.lock().await;
     if let Some(entries) = group_cache.get(id) {
         return Ok(entries.clone());
     }
 
-    let mut cache = pim_client.object_cache.lock();
+    let mut cache = pim_client.object_cache.lock().await;
 
     let url = format!("https://graph.microsoft.com/v1.0/groups/{id}/members");
     let request = pim_client
         .backend
         .client
         .request(Method::GET, &url)
-        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph)?)
+        .bearer_auth(pim_client.backend.get_token(TokenScope::Graph).await?)
         .build()?;
-    let value = pim_client.backend.retry_request(&request, None)?;
+    let value = pim_client.backend.retry_request(&request, None).await?;
     let results = parse_objects(&value)?;
 
     for object in &results {

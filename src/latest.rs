@@ -1,6 +1,6 @@
 use anyhow::{ensure, Context, Result};
 use home::home_dir;
-use reqwest::{blocking::Client, header::USER_AGENT};
+use reqwest::{header::USER_AGENT, Client};
 use semver::Version;
 use serde_json::Value;
 use std::{
@@ -38,7 +38,7 @@ fn read_cached_latest(path: &Path) -> Result<Version> {
 /// # Returns
 /// * Does not check if `$HOME` cannot be determined
 /// * Does not check if `$HOME/.cache/az-pim-cli` cannot be created
-pub fn check_latest_version() -> Result<()> {
+pub async fn check_latest_version() -> Result<()> {
     let current =
         Version::parse(env!("CARGO_PKG_VERSION")).context("unable to parse current version")?;
 
@@ -70,8 +70,10 @@ pub fn check_latest_version() -> Result<()> {
         .get(RELEASES_API_URL)
         .header(USER_AGENT, "az-pim-cli")
         .send()
+        .await
         .context("unable to send request to GitHub")?
         .text()
+        .await
         .context("unable to receive response from GitHub")?;
     trace!("response: {text:?}");
     let response: Value = serde_json::from_str(&text).context("unable to deserialize response")?;

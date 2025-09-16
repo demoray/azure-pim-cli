@@ -1,7 +1,14 @@
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result};
+use azure_core::credentials::TokenCredential;
+use azure_identity::{AzureCliCredential, AzureDeveloperCliCredential, TokenCredentialOptions};
+use azure_identity_helpers::{
+    azureauth_cli_credentials::AzureauthCliCredential,
+    chained_token_credential::ChainedTokenCredential,
+};
 use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
+use home::home_dir;
 use serde_json::Value;
-use std::process::Command;
+use tokio::fs::read;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub(crate) enum TokenScope {
@@ -18,45 +25,47 @@ impl TokenScope {
     }
 }
 
-#[cfg(target_os = "windows")]
-const AZ_CMD: &str = "az.cmd";
-#[cfg(not(target_os = "windows"))]
-const AZ_CMD: &str = "az";
-
-/// Execute an Azure CLI command
-///
-/// # Errors
-/// Will return `Err` if the Azure CLI fails
-fn az_cmd(args: &[&str]) -> Result<String> {
-    let output = Command::new(AZ_CMD)
-        .args(args)
-        .output()
-        .with_context(|| format!("unable to launch {AZ_CMD}"))?;
-    ensure!(
-        output.status.success(),
-        "az command failed {}",
-        String::from_utf8(output.stderr)?
-    );
-    let output = String::from_utf8(output.stdout)?;
-    Ok(output.trim().to_string())
+/// Read the default tenant from the azure CLI config
+async fn read_default_tenant() -> Option<String> {
+    let dir = home_dir()?;
+    let profile = dir.join(".azure/azureProfile.json");
+    let mut subscriptions = read(&profile).await.ok()?;
+    if subscriptions.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        subscriptions.drain(..3);
+    }
+    let profile: Value = serde_json::from_slice(&subscriptions).ok()?;
+    let subscriptions = profile.get("subscriptions")?;
+    for subscription in subscriptions.as_array()? {
+        if subscription.get("isDefault")?.as_bool().unwrap_or(false) {
+            return subscription
+                .get("tenantId")?
+                .as_str()
+                .map(ToString::to_string);
+        }
+    }
+    None
 }
 
-/// Get an Oauth token from Azure CLI for the current user
+/// Get an Oauth token for the current user
 ///
 /// # Errors
-/// Will return `Err` if the Azure CLI fails
-pub(crate) fn get_token(scope: TokenScope) -> Result<String> {
-    az_cmd(&[
-        "account",
-        "get-access-token",
-        "--scope",
-        scope.to_scope_endpoint(),
-        "--query",
-        "accessToken",
-        "--output",
-        "tsv",
-    ])
-    .with_context(|| format!("unable to obtain token to {}", scope.to_scope_endpoint()))
+/// Will return `Err` if the authentication fails
+pub async fn get_token(scope: TokenScope) -> Result<String> {
+    let mut provider = ChainedTokenCredential::new(Some(TokenCredentialOptions::default().into()));
+    provider.add_source(AzureCliCredential::new(None)?);
+    provider.add_source(AzureDeveloperCliCredential::new(None)?);
+    if let Some(tenant_id) = read_default_tenant().await {
+        provider.add_source(AzureauthCliCredential::new(
+            tenant_id,
+            "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+        )?);
+    }
+
+    let token = provider
+        .get_token(&[scope.to_scope_endpoint()], None)
+        .await?;
+
+    Ok(token.token.secret().to_string())
 }
 
 pub(crate) fn extract_oid(token: &str) -> Result<String> {
