@@ -111,6 +111,10 @@ impl Backend {
                     bail!("rate limited");
                 }
 
+                if status == StatusCode::UNAUTHORIZED {
+                    bail!("unauthorized");
+                }
+
                 let body = response.text().await?;
                 trace!("response body: {body:#?}");
                 let body = serde_json::from_str(&body)?;
