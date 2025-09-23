@@ -58,7 +58,7 @@ fn parse_objects(value: &Value) -> Result<BTreeSet<Object>> {
                 "#microsoft.graph.group" => PrincipalType::Group,
                 "#microsoft.graph.servicePrincipal" => PrincipalType::ServicePrincipal,
                 _ => {
-                    bail!("unknown object type: {} - {value:#?}", data_type);
+                    bail!("unknown object type: {data_type} - {value:#?}");
                 }
             };
             results.insert(Object {
