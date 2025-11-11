@@ -15,7 +15,7 @@ default-run = "az-pim"
 anyhow = "1.0"
 azure-identity-helpers = "0.0.10"
 azure_core = "0.29"
-azure_identity = "0.29"
+azure_identity = "0.30"
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
