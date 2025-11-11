@@ -51,7 +51,7 @@ jobs:
     - run: eng/build.sh ${{ matrix.target }}
       shell: bash
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       if: matrix.build == 'windows'
       with:
         name: ${{ matrix.build }}
@@ -60,7 +60,7 @@ jobs:
           target/x86_64-pc-windows-msvc/release/dump-roles.exe
         if-no-files-found: error
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       if: matrix.build == 'macos'
       with:
         name: ${{ matrix.build }}
@@ -69,7 +69,7 @@ jobs:
           target/aarch64-apple-darwin/release/dump-roles
         if-no-files-found: error
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       if: matrix.build == 'linux-musl'
       with:
         name: ${{ matrix.build }}
@@ -78,7 +78,7 @@ jobs:
           target/x86_64-unknown-linux-musl/release/dump-roles
         if-no-files-found: error
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       if: startsWith(matrix.build, 'ubuntu-')
       with:
         name: ${{ matrix.build }}
