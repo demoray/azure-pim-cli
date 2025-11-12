@@ -9,6 +9,7 @@ use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
 use serde_json::Value;
 use std::env::home_dir;
 use tokio::fs::read;
+use tracing::trace;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub(crate) enum TokenScope {
@@ -73,12 +74,19 @@ pub async fn get_token(scope: TokenScope) -> Result<String> {
 }
 
 pub(crate) fn extract_oid(token: &str) -> Result<String> {
-    let token = BASE64_STANDARD_NO_PAD.decode(token.split('.').nth(1).context("invalid token")?)?;
-    let token: Value = serde_json::from_slice(&token)?;
-    Ok(token
-        .get("oid")
-        .context("no oid in token")?
-        .as_str()
-        .context("token is not string")?
-        .to_string())
+    trace!("identifying oid from token: {token}");
+    let part = token
+        .split('.')
+        .nth(1)
+        .context("unable to find token marker")?;
+    trace!("extracted base64-header from token: {part}");
+    let bytes = BASE64_STANDARD_NO_PAD
+        .decode(part)
+        .context("base64 decoding failed")?;
+    let json: Value = serde_json::from_slice(&bytes).context("json parsing failed")?;
+    trace!("parsed json from base64-decoded token: {json:?}");
+    let oid = json.get("oid").context("no oid in token")?;
+    trace!("extracted oid from token: {oid:?}");
+    let as_str = oid.as_str().context("oid is not a string")?;
+    Ok(as_str.to_string())
 }
