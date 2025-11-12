@@ -73,8 +73,16 @@ pub async fn get_token(scope: TokenScope) -> Result<String> {
 }
 
 pub(crate) fn extract_oid(token: &str) -> Result<String> {
-    let token = BASE64_STANDARD_NO_PAD.decode(token.split('.').nth(1).context("invalid token")?)?;
-    let token: Value = serde_json::from_slice(&token)?;
+    let token = BASE64_STANDARD_NO_PAD
+        .decode(
+            token
+                .split('.')
+                .nth(1)
+                .context("unable to find token marker")?,
+        )
+        .context("unable to decode base64 token")?;
+    let token: Value =
+        serde_json::from_slice(&token).context("unable to parse json from base64-decoded token")?;
     Ok(token
         .get("oid")
         .context("no oid in token")?
