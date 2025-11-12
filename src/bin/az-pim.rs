@@ -2,6 +2,7 @@ use anyhow::{ensure, Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
+    logging::{setup_logging, Verbosity},
     models::{
         assignments::Assignment,
         roles::{Role, RoleAssignment, RolesExt},
@@ -9,7 +10,7 @@ use azure_pim_cli::{
     },
     ListFilter, PimClient,
 };
-use clap::{ArgAction, Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
+use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Shell};
 use humantime::Duration as HumanDuration;
 use serde::{Deserialize, Serialize};
@@ -19,13 +20,12 @@ use std::{
     error::Error,
     fmt::Write,
     fs::{read, File},
-    io::{stderr, stdout},
+    io::stdout,
     path::PathBuf,
     str::FromStr,
     time::Duration,
 };
 use tracing::{debug, info};
-use tracing_subscriber::filter::LevelFilter;
 
 const DEFAULT_DURATION: &str = "8 hours";
 
@@ -793,19 +793,7 @@ struct Roles(Vec<ElevateEntry>);
 async fn main() -> Result<()> {
     let args = Cmd::parse();
 
-    let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
-        x
-    } else {
-        tracing_subscriber::EnvFilter::builder()
-            .with_default_directive(args.verbose.get_level().into())
-            .parse("typespec_client_core=warn")?
-    };
-
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(stderr)
-        .try_init()
-        .ok();
+    setup_logging(&args.verbose)?;
 
     if let Err(err) = check_latest_version().await {
         debug!("unable to check latest version: {err}");
@@ -885,30 +873,4 @@ async fn build_set(
     }
 
     Ok(to_add)
-}
-
-#[derive(Args)]
-#[command(about = None)]
-struct Verbosity {
-    /// Increase logging verbosity.  Provide repeatedly to increase the verbosity.
-    #[clap(long, action = ArgAction::Count, global = true)]
-    verbose: u8,
-
-    /// Only show errors
-    #[clap(long, global = true, conflicts_with = "verbose")]
-    quiet: bool,
-}
-
-impl Verbosity {
-    fn get_level(&self) -> LevelFilter {
-        if self.quiet {
-            LevelFilter::ERROR
-        } else {
-            match self.verbose {
-                0 => LevelFilter::INFO,
-                1 => LevelFilter::DEBUG,
-                _ => LevelFilter::TRACE,
-            }
-        }
-    }
 }

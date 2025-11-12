@@ -15,6 +15,7 @@ mod expiring;
 pub mod graph;
 pub mod interactive;
 mod latest;
+pub mod logging;
 pub mod models;
 
 pub use crate::latest::check_latest_version;
