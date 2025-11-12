@@ -2,20 +2,17 @@ use anyhow::{Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     graph::PrincipalType,
+    logging::{setup_logging, Verbosity},
     models::{
         roles::Role,
         scope::{Scope, ScopeBuilder},
     },
     ListFilter, PimClient,
 };
-use clap::{ArgAction, Args, CommandFactory, Parser};
+use clap::{CommandFactory, Parser};
 use serde::Serialize;
-use std::{
-    collections::BTreeSet,
-    io::{stderr, stdout},
-};
+use std::{collections::BTreeSet, io::stdout};
 use tracing::{debug, warn};
-use tracing_subscriber::filter::LevelFilter;
 
 /// A CLI to dump all the roles in a given scope
 #[derive(Parser)]
@@ -84,19 +81,7 @@ async fn main() -> Result<()> {
         expand_groups,
     } = Cmd::build()?;
 
-    let filter = if let Ok(x) = tracing_subscriber::EnvFilter::try_from_default_env() {
-        x
-    } else {
-        tracing_subscriber::EnvFilter::builder()
-            .with_default_directive(verbose.get_level().into())
-            .parse("typespec_client_core=warn")?
-    };
-
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(stderr)
-        .try_init()
-        .ok();
+    setup_logging(&verbose)?;
 
     if let Err(err) = check_latest_version().await {
         debug!("unable to check latest version: {err}");
@@ -177,32 +162,6 @@ async fn main() -> Result<()> {
 
     serde_json::to_writer_pretty(stdout(), &results)?;
     Ok(())
-}
-
-#[derive(Args)]
-#[command(about = None)]
-struct Verbosity {
-    /// Increase logging verbosity.  Provide repeatedly to increase the verbosity.
-    #[clap(long, action = ArgAction::Count, global = true)]
-    verbose: u8,
-
-    /// Only show errors
-    #[clap(long, global = true, conflicts_with = "verbose")]
-    quiet: bool,
-}
-
-impl Verbosity {
-    fn get_level(&self) -> LevelFilter {
-        if self.quiet {
-            LevelFilter::ERROR
-        } else {
-            match self.verbose {
-                0 => LevelFilter::INFO,
-                1 => LevelFilter::DEBUG,
-                _ => LevelFilter::TRACE,
-            }
-        }
-    }
 }
 
 fn remove_dominated_scopes(data: BTreeSet<Entry>) -> BTreeSet<Entry> {
