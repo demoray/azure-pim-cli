@@ -1,10 +1,10 @@
 use anyhow::{ensure, Context, Result};
-use home::home_dir;
 use reqwest::{header::USER_AGENT, Client};
 use semver::Version;
 use serde_json::Value;
 use std::{
     cmp::Ordering,
+    env::home_dir,
     fs::{create_dir_all, metadata, read, write},
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},

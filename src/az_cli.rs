@@ -6,7 +6,7 @@ use azure_identity_helpers::{
     chained_token_credential::ChainedTokenCredential, devicecode_credentials::DeviceCodeCredential,
 };
 use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
-use home::home_dir;
+use std::env::home_dir;
 use serde_json::Value;
 use tokio::fs::read;
 
