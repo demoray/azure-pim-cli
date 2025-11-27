@@ -35,7 +35,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.18", features = ["v7"] }
 
 [dev-dependencies]
-insta = { version = "1.43", features = ["json"] }
+insta = { version = "1.44", features = ["json"] }
 
 [target.'cfg(target_env = "musl")'.dependencies]
 reqwest = { version = "0.12", features = ["native-tls-vendored"] }
