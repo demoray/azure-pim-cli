@@ -30,7 +30,7 @@ jobs:
           target:
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - run: rustup update
     - run: rustup target add ${{ matrix.target }}
       if: ${{ matrix.target }}
@@ -93,7 +93,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v6
         with:
           path: artifacts
