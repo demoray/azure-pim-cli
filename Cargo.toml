@@ -32,7 +32,7 @@ thiserror = "2.0"
 tokio = "1.48"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.18", features = ["v7"] }
+uuid = { version = "1.19", features = ["v7"] }
 
 [dev-dependencies]
 insta = { version = "1.44", features = ["json"] }
