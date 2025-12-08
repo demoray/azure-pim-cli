@@ -1,13 +1,13 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use azure_core::credentials::TokenCredential;
-use azure_identity::{AzureCliCredential, AzureDeveloperCliCredential};
+use azure_identity::{new_executor, AzureCliCredential, AzureDeveloperCliCredential};
 use azure_identity_helpers::{
     azureauth_cli_credentials::AzureauthCliCredential,
     chained_token_credential::ChainedTokenCredential, devicecode_credentials::DeviceCodeCredential,
 };
 use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
 use serde_json::Value;
-use std::env::home_dir;
+use std::{env::home_dir, ffi::OsStr};
 use tokio::fs::read;
 use tracing::trace;
 
@@ -89,4 +89,46 @@ pub(crate) fn extract_oid(token: &str) -> Result<String> {
     trace!("extracted oid from token: {oid:?}");
     let as_str = oid.as_str().context("oid is not a string")?;
     Ok(as_str.to_string())
+}
+
+/// Find the az CLI executable
+async fn find_az() -> Option<&'static OsStr> {
+    #[cfg(target_os = "windows")]
+    let which = "where";
+    #[cfg(not(target_os = "windows"))]
+    let which = "which";
+
+    for &exe in &[OsStr::new("az.exe"), OsStr::new("az")] {
+        if new_executor()
+            .run(OsStr::new(which), &[exe])
+            .await
+            .map(|x| x.status.success())
+            .unwrap_or(false)
+        {
+            return Some(exe);
+        }
+    }
+    None
+}
+
+pub(crate) async fn get_signed_in_user_oid() -> Result<String> {
+    let cmd = ["ad", "signed-in-user", "show", "--query", "id", "-o", "tsv"];
+    let cmd = cmd.iter().map(AsRef::as_ref).collect::<Vec<&OsStr>>();
+    let az_exe = find_az()
+        .await
+        .context("unable to find az CLI executable in PATH")?;
+    let executor = new_executor();
+    let result = executor
+        .run(az_exe, &cmd)
+        .await
+        .context("failed to run az CLI")?;
+    if !result.status.success() {
+        bail!("az CLI returned non-zero exit code: {}", result.status);
+    }
+    let stdout = String::from_utf8(result.stdout).context("az CLI output was not valid UTF-8")?;
+    let oid = stdout.trim();
+    if oid.is_empty() {
+        bail!("no signed-in user found in az CLI");
+    }
+    Ok(oid.to_string())
 }

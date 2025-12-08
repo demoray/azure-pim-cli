@@ -1,5 +1,5 @@
 use crate::{
-    az_cli::{extract_oid, get_token, TokenScope},
+    az_cli::{extract_oid, get_signed_in_user_oid, get_token, TokenScope},
     models::scope::Scope,
 };
 use anyhow::{bail, Context, Result};
@@ -77,7 +77,14 @@ impl Backend {
 
     pub(crate) async fn principal_id(&self) -> Result<String> {
         let mgmt_token = self.get_token(TokenScope::Management).await?;
-        extract_oid(&mgmt_token).context("unable to obtain the current user")
+        let result = extract_oid(&mgmt_token).context("unable to obtain the current user");
+        if result.is_err() {
+            debug!("falling back to az cli to get the current user");
+            return get_signed_in_user_oid().await.context(
+                "unable to obtain the current user via az cli after extraction from token failed",
+            );
+        }
+        result
     }
 
     pub(crate) async fn get_token(&self, scope: TokenScope) -> Result<String> {
