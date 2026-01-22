@@ -801,8 +801,8 @@ $ az-pim role resources list --subscription 00000000-0000-0000-0000-000000000000
 Usage: cleanup [OPTIONS] <COMMAND>
 
 Commands:
-  all                            Delete orphaned role assignments and orphaned eligibile role assignments for all available scopes
-  auto                           Delete orphaned role assignments and orphaned eligibile role assignments
+  all                            Delete orphaned role assignments and orphaned eligible role assignments for all available scopes
+  auto                           Delete orphaned role assignments and orphaned eligible role assignments
   orphaned-assignments           Delete orphaned role assignments
   orphaned-eligible-assignments  Delete orphaned eligible role assignments
 
@@ -820,7 +820,7 @@ Options:
 ### az-pim cleanup all
 
 ```
-Delete orphaned role assignments and orphaned eligibile role assignments for all available scopes
+Delete orphaned role assignments and orphaned eligible role assignments for all available scopes
 
 Usage: all [OPTIONS]
 
@@ -841,7 +841,7 @@ Options:
 ### az-pim cleanup auto
 
 ```
-Delete orphaned role assignments and orphaned eligibile role assignments
+Delete orphaned role assignments and orphaned eligible role assignments
 
 Usage: auto [OPTIONS]
 

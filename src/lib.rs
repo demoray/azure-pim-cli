@@ -629,7 +629,7 @@ impl PimClient {
         Ok(())
     }
 
-    /// Delete eligibile role assignment
+    /// Delete eligible role assignment
     ///
     /// This removes role assignments that are available via PIM.
     ///

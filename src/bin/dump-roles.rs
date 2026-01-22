@@ -24,7 +24,7 @@ struct Cmd {
     #[clap(flatten)]
     scope: ScopeBuilder,
 
-    /// Show role assignments that are eligibile to be activated rather than active assignments
+    /// Show role assignments that are eligible to be activated rather than active assignments
     #[clap(long)]
     eligible: bool,
 

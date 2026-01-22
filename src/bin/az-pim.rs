@@ -492,14 +492,14 @@ impl AssignmentSubCommand {
 
 #[derive(Subcommand)]
 enum CleanupSubCommand {
-    /// Delete orphaned role assignments and orphaned eligibile role assignments for all available scopes
+    /// Delete orphaned role assignments and orphaned eligible role assignments for all available scopes
     All {
         /// Always respond yes to confirmations
         #[arg(long)]
         yes: bool,
     },
 
-    /// Delete orphaned role assignments and orphaned eligibile role assignments
+    /// Delete orphaned role assignments and orphaned eligible role assignments
     Auto {
         #[clap(flatten)]
         scope: ScopeBuilder,
