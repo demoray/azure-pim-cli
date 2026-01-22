@@ -1,5 +1,5 @@
 use crate::models::roles::RoleAssignment;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ratatui::{
     crossterm::{
         event::{
@@ -315,7 +315,9 @@ impl App {
     fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Option<Selected>> {
         self.check();
         loop {
-            terminal.draw(|f| self.draw(f))?;
+            terminal
+                .draw(|f| self.draw(f))
+                .map_err(|e| anyhow!("Failed to draw terminal: {e}"))?;
 
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
