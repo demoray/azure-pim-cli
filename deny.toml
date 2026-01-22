@@ -18,7 +18,7 @@ yanked = "deny"
 multiple-versions = "allow"
 
 [licenses]
-allow = ["Apache-2.0", "BSD-3-Clause", "BSL-1.0", "MIT", "Unicode-3.0", "Zlib"]
+allow = ["Apache-2.0", "BSD-3-Clause", "BSL-1.0", "MIT", "Unicode-3.0", "Zlib", "ISC", "OpenSSL"]
 version = 2
 
 [licenses.private]
