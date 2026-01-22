@@ -7,10 +7,6 @@ targets = [
 ]
 
 [advisories]
-ignore = [
-    # allow `paste`, which is no longer maintained
-    "RUSTSEC-2024-0436"
-]
 version = 2
 yanked = "deny"
 
