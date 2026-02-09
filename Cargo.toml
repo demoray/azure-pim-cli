@@ -12,30 +12,30 @@ version = "0.12.0"
 default-run = "az-pim"
 
 [dependencies]
-anyhow = "1.0"
-azure-identity-helpers = "0.0.12"
-azure_core = "0.31"
-azure_identity = "0.31"
-base64 = "0.22"
-clap = { version = "4.5", features = ["derive"] }
-clap_complete = "4.5"
-derive_setters = "0.1"
-exponential-backoff = "2.1.0"
-futures = "0.3.31"
-humantime = "2.3"
-ratatui = { version = "0.30", features = ["crossterm"] }
-reqwest = { version = "0.13", features = ["json", "query"] }
-semver = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0"
-tokio = "1.49"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.20", features = ["v7"] }
+anyhow = { version ="1.0", default-features = false, features = ["std"] }
+azure-identity-helpers = { version = "0.0.12", default-features = false }
+azure_core = { version = "0.31", default-features = false }
+azure_identity = { version = "0.31", default-features = false }
+base64 = { version = "0.22", default-features = false }
+clap = { version = "4.5", default-features = false, features = ["derive", "std", "help", "usage", "error-context", "color", "suggestions"] }
+clap_complete = { version = "4.5", default-features = false }
+derive_setters = { version = "0.1", default-features = false }
+exponential-backoff = { version = "2.1.0", default-features = false }
+futures = { version = "0.3.31", default-features = false }
+humantime = { version = "2.3", default-features = false }
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls"] }
+semver = { version = "1.0", default-features = false, features = ["std"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+thiserror = { version = "2.0", default-features = false }
+tokio = { version = "1.49", default-features = false, features = ["fs", "macros", "rt-multi-thread", "sync", "time"] }
+tracing = { version = "0.1", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
+uuid = { version = "1.20", default-features = false, features = ["v7"] }
 
 [dev-dependencies]
-insta = { version = "1.46", features = ["json"] }
+insta = { version = "1.46", default-features = false, features = ["json"] }
 
 [target.'cfg(target_env = "musl")'.dependencies]
-reqwest = { version = "0.13", features = ["native-tls-vendored"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls-vendored"] }
