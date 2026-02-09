@@ -11,13 +11,17 @@ use azure_pim_cli::{
     ListFilter, PimClient,
 };
 use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
-use clap_complete::{generate, Shell};
+use clap_complete::{
+    engine::{ArgValueCompleter, CompletionCandidate},
+    CompleteEnv, Shell,
+};
 use humantime::Duration as HumanDuration;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
     collections::BTreeSet,
     error::Error,
+    ffi::OsStr,
     fmt::Write,
     fs::{read, File},
     io::stdout,
@@ -28,6 +32,64 @@ use std::{
 use tracing::{debug, info};
 
 const DEFAULT_DURATION: &str = "8 hours";
+
+#[derive(Deserialize)]
+struct RoleCompletion {
+    role: String,
+    scope: String,
+    #[serde(default)]
+    scope_name: Option<String>,
+}
+
+fn list_roles(current: &OsStr, active: bool) -> Vec<CompletionCandidate> {
+    let current = current.to_string_lossy();
+    let Ok(exe) = std::env::current_exe() else {
+        return vec![];
+    };
+
+    let mut cmd = std::process::Command::new(exe);
+    cmd.env_remove("COMPLETE");
+    cmd.arg("list");
+    if active {
+        cmd.arg("--active");
+    }
+
+    let Ok(output) = cmd.output() else {
+        return vec![];
+    };
+
+    if !output.status.success() {
+        return vec![];
+    }
+
+    let Ok(roles) = serde_json::from_slice::<Vec<RoleCompletion>>(&output.stdout) else {
+        return vec![];
+    };
+
+    let mut seen = BTreeSet::new();
+    roles
+        .into_iter()
+        .filter(|r| r.role.to_lowercase().starts_with(&current.to_lowercase()))
+        .filter(|r| seen.insert(format!("{}:{}", r.role, r.scope)))
+        .map(|r| {
+            let help = r
+                .scope_name
+                .as_deref()
+                .unwrap_or(&r.scope)
+                .to_string()
+                .into();
+            CompletionCandidate::new(r.role).help(Some(help))
+        })
+        .collect()
+}
+
+fn complete_eligible_roles(current: &OsStr) -> Vec<CompletionCandidate> {
+    list_roles(current, false)
+}
+
+fn complete_active_roles(current: &OsStr) -> Vec<CompletionCandidate> {
+    list_roles(current, true)
+}
 
 #[derive(Parser)]
 #[command(version, disable_help_subcommand = true, name = "az-pim")]
@@ -40,12 +102,6 @@ struct Cmd {
 }
 
 impl Cmd {
-    fn shell_completion(shell: Shell) {
-        let mut cmd = Self::command();
-        let name = cmd.get_name().to_string();
-        generate(shell, &mut cmd, name, &mut stdout());
-    }
-
     fn example(cmd: &str) -> Option<&'static str> {
         match cmd {
             "az-pim"
@@ -148,7 +204,13 @@ enum SubCommand {
     /// Setup shell tab completions
     ///
     /// This command will generate shell completions for the specified shell.
-    Init { shell: Shell },
+    Init {
+        shell: Shell,
+
+        #[clap(long)]
+        /// Print the source command rather than the completions themselves
+        source_command: bool,
+    },
 
     #[command(hide = true)]
     /// Generate the README.md file dynamically
@@ -160,6 +222,7 @@ enum ActivateSubCommand {
     /// Activate a specific role
     Role {
         /// Name of the role to activate
+        #[arg(add = ArgValueCompleter::new(complete_eligible_roles))]
         role: Role,
 
         /// Justification for the request
@@ -337,6 +400,7 @@ enum DeactivateSubCommand {
     /// Deactivate a specific role
     Role {
         /// Name of the role to deactivate
+        #[arg(add = ArgValueCompleter::new(complete_active_roles))]
         role: Role,
 
         #[clap(flatten)]
@@ -791,6 +855,8 @@ struct Roles(Vec<ElevateEntry>);
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    CompleteEnv::with_factory(Cmd::command).complete();
+
     let args = Cmd::parse();
 
     setup_logging(&args.verbose)?;
@@ -828,8 +894,46 @@ async fn main() -> Result<()> {
         },
         SubCommand::Cleanup { cmd } => cmd.run(&client).await,
         SubCommand::Readme => build_readme(),
-        SubCommand::Init { shell } => {
-            Cmd::shell_completion(shell);
+        SubCommand::Init {
+            shell,
+            source_command,
+        } => {
+            let shell_name = match shell {
+                Shell::Bash => "bash",
+                Shell::Zsh => "zsh",
+                Shell::Fish => "fish",
+                Shell::PowerShell => "powershell",
+                Shell::Elvish => "elvish",
+                _ => "bash",
+            };
+            if source_command {
+                match shell {
+                    Shell::Bash | Shell::Zsh => {
+                        println!(r#"source <(COMPLETE={shell_name} az-pim)"#);
+                    }
+                    Shell::Fish => {
+                        println!(r#"COMPLETE={shell_name} az-pim | source"#);
+                    }
+                    Shell::PowerShell => {
+                        println!(r#"$env:COMPLETE = "{shell_name}"; az-pim | Out-String | Invoke-Expression; Remove-Item Env:\COMPLETE"#);
+                    }
+                    Shell::Elvish => {
+                        println!(r#"eval (E:COMPLETE={shell_name} az-pim | slurp)"#);
+                    }
+                    _ => {
+                        println!(r#"source <(COMPLETE={shell_name} az-pim)"#);
+                    }
+                }
+            } else {
+                let exe =
+                    std::env::current_exe().context("unable to determine current executable")?;
+                let output = std::process::Command::new(exe)
+                    .env("COMPLETE", shell_name)
+                    .output()
+                    .context("unable to generate completions")?;
+                std::io::Write::write_all(&mut stdout(), &output.stdout)
+                    .context("unable to write completions")?;
+            }
             Ok(())
         }
     }
