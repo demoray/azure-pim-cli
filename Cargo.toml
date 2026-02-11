@@ -15,7 +15,7 @@ default-run = "az-pim"
 anyhow = { version ="1.0", default-features = false, features = ["std"] }
 azure-identity-helpers = { version = "0.0.12", default-features = false }
 azure_core = { version = "0.31", default-features = false }
-azure_identity = { version = "0.31", default-features = false }
+azure_identity = { version = "0.32", default-features = false }
 base64 = { version = "0.22", default-features = false }
 clap = { version = "4.5", default-features = false, features = ["derive", "std", "help", "usage", "error-context", "color", "suggestions"] }
 clap_complete = { version = "4.5", default-features = false }
