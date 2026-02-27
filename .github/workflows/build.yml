@@ -35,13 +35,13 @@ jobs:
     - run: rustup target add ${{ matrix.target }}
       if: ${{ matrix.target }}
     - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
-    - uses: baptiste0928/cargo-install@b687c656bda5733207e629b50a22bf68974a0305
+    - uses: baptiste0928/cargo-install@f204293d9709061b7bc1756fec3ec4e2cd57dec0
       with:
         crate: cargo-deny
-    - uses: baptiste0928/cargo-install@b687c656bda5733207e629b50a22bf68974a0305
+    - uses: baptiste0928/cargo-install@f204293d9709061b7bc1756fec3ec4e2cd57dec0
       with:
         crate: typos-cli
-    - uses: baptiste0928/cargo-install@b687c656bda5733207e629b50a22bf68974a0305
+    - uses: baptiste0928/cargo-install@f204293d9709061b7bc1756fec3ec4e2cd57dec0
       with:
         crate: cargo-deb
       if: matrix.build == 'ubuntu-24.04'
