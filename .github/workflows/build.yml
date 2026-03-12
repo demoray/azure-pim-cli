@@ -34,7 +34,7 @@ jobs:
     - run: rustup update
     - run: rustup target add ${{ matrix.target }}
       if: ${{ matrix.target }}
-    - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
     - uses: baptiste0928/cargo-install@f204293d9709061b7bc1756fec3ec4e2cd57dec0
       with:
         crate: cargo-deny
