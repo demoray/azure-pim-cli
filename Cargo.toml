@@ -35,7 +35,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["e
 uuid = { version = "1.22", default-features = false, features = ["v7"] }
 
 [dev-dependencies]
-insta = { version = "1.46", default-features = false, features = ["json"] }
+insta = { version = "1.47", default-features = false, features = ["json"] }
 
 [target.'cfg(target_env = "musl")'.dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls-vendored"] }
