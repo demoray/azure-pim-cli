@@ -13,7 +13,7 @@ default-run = "az-pim"
 
 [dependencies]
 anyhow = { version ="1.0", default-features = false, features = ["std"] }
-azure-identity-helpers = { version = "0.0.14", default-features = false }
+azure-identity-helpers = { version = "0.0.16", default-features = false }
 azure_core = { version = "0.33", default-features = false }
 azure_identity = { version = "0.33", default-features = false }
 base64 = { version = "0.22", default-features = false }
