@@ -91,9 +91,9 @@ pub struct PimClient {
 impl PimClient {
     pub fn new() -> Result<Self> {
         let backend = Backend::new();
-        let object_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
-        let group_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
-        let role_definitions_cache = Mutex::new(ExpiringMap::new(Duration::from_secs(60 * 10)));
+        let object_cache = Mutex::new(ExpiringMap::new(Duration::from_mins(10)));
+        let group_cache = Mutex::new(ExpiringMap::new(Duration::from_mins(10)));
+        let role_definitions_cache = Mutex::new(ExpiringMap::new(Duration::from_mins(10)));
         Ok(Self {
             backend,
             object_cache,
