@@ -586,11 +586,11 @@ impl CleanupSubCommand {
                         .activate_role_assignment_set(
                             &to_activate,
                             "cleaning up orphaned resources",
-                            Duration::from_secs(60 * 60 * 8),
+                            Duration::from_hours(8),
                         )
                         .await?;
                     client
-                        .wait_for_role_activation(&to_activate, Duration::from_secs(60 * 5))
+                        .wait_for_role_activation(&to_activate, Duration::from_mins(5))
                         .await?;
                 }
 
@@ -615,7 +615,7 @@ impl CleanupSubCommand {
                     .activate_role_admin(
                         &scope,
                         "cleaning up orphaned assignments",
-                        Duration::from_secs(5 * 60),
+                        Duration::from_mins(5),
                     )
                     .await?;
                 client

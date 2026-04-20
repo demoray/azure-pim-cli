@@ -102,8 +102,7 @@ async fn find_az() -> Option<&'static OsStr> {
         if new_executor()
             .run(OsStr::new(which), &[exe])
             .await
-            .map(|x| x.status.success())
-            .unwrap_or(false)
+            .is_ok_and(|x| x.status.success())
         {
             return Some(exe);
         }
