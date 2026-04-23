@@ -315,7 +315,7 @@ impl ActivateSubCommand {
                     Some(justification.unwrap_or_default()),
                     Some(duration.as_secs() / 60),
                 )? {
-                    let duration = Duration::from_secs(duration * 60);
+                    let duration = Duration::from_mins(duration);
                     client
                         .activate_role_assignment_set(&assignments, &justification, duration)
                         .await?;
