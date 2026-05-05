@@ -161,6 +161,7 @@ dependencies = [
  "rustc_version",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
  "typespec",
  "typespec_client_core",
@@ -192,6 +193,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "tokio",
  "tracing",
  "url",
 ]
@@ -1536,6 +1538,7 @@ dependencies = [
  "base64",
  "bytes",
  "futures-core",
+ "futures-util",
  "http",
  "http-body",
  "http-body-util",
@@ -1554,12 +1557,14 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
+ "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
 ]
 
@@ -1944,6 +1949,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys",
@@ -1967,6 +1973,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
 dependencies = [
  "native-tls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-util"
+version = "0.7.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae9cec805b01e8fc3fd2fe289f89149a9b66dd16786abd8b19cfa7b48cb0098"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "pin-project-lite",
  "tokio",
 ]
 
@@ -2094,9 +2113,11 @@ dependencies = [
  "futures",
  "pin-project",
  "rand",
+ "reqwest",
  "serde",
  "serde_json",
  "time",
+ "tokio",
  "tracing",
  "typespec",
  "typespec_macros",
@@ -2300,6 +2321,19 @@ dependencies = [
  "indexmap",
  "wasm-encoder",
  "wasmparser",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
