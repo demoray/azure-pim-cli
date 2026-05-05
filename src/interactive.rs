@@ -12,7 +12,8 @@ use ratatui::{
     },
     prelude::*,
     widgets::{
-        Block, BorderType, HighlightSpacing, Paragraph, Row, ScrollbarState, Table, TableState,
+        Block, BorderType, Cell, HighlightSpacing, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table, TableState,
     },
 };
 use std::{collections::BTreeSet, io::stdout};
@@ -24,7 +25,12 @@ const JUSTIFICATION_TEXT: &str = "Type to enter justification";
 const SCOPE_TEXT: &str = "↑ or ↓ to move | Space to toggle";
 const DURATION_TEXT: &str = "↑ or ↓ to update duration";
 const ALL_HELP: &str = "Tab or Shift-Tab to change sections | Enter to activate | Esc to quit";
-const ITEM_HEIGHT: u16 = 2;
+const MIN_ITEM_HEIGHT: u16 = 2;
+// Width occupied by table chrome inside the bordered block:
+// 2 for borders + 1 leading pad + 4 for the highlight spacing column ("  > ").
+const SCOPES_CHROME: u16 = 7;
+// Minimum width we will allocate to either column before falling back.
+const MIN_COL_WIDTH: u16 = 8;
 
 pub struct Selected {
     pub assignments: BTreeSet<RoleAssignment>,
@@ -71,7 +77,7 @@ impl App {
             table_state: TableState::default().with_selected(0),
             justification,
             longest_item_lens: column_widths(&assignments)?,
-            scroll_state: ScrollbarState::new((assignments.len() - 1) * usize::from(ITEM_HEIGHT)),
+            scroll_state: ScrollbarState::new(assignments.len().saturating_sub(1)),
             items: assignments
                 .into_iter()
                 .map(|value| Entry {
@@ -103,7 +109,7 @@ impl App {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * usize::from(ITEM_HEIGHT));
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     pub fn previous(&mut self) {
@@ -118,7 +124,7 @@ impl App {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * usize::from(ITEM_HEIGHT));
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn check(&mut self) {
@@ -249,45 +255,85 @@ impl App {
     }
 
     fn render_scopes(&mut self, frame: &mut Frame, area: Rect) {
-        frame.render_stateful_widget(
-            Table::new(
-                self.items.iter().map(|data| {
-                    Row::new(vec![
-                        format!(
-                            "{} {}",
-                            if data.enabled { ENABLED } else { DISABLED },
-                            data.value.role
-                        ),
-                        if let Some(scope_name) = data.value.scope_name.as_deref() {
-                            format!("{scope_name}\n{}", data.value.scope)
-                        } else {
-                            data.value.scope.to_string()
-                        },
-                    ])
-                    .height(ITEM_HEIGHT)
-                }),
-                [
-                    Constraint::Length(self.longest_item_lens.0 + 4),
-                    Constraint::Min(self.longest_item_lens.1 + 1),
-                ],
+        // Carve up the area between the role and scope columns based on the
+        // current terminal width, so long scope paths don't get silently
+        // truncated on a normal-width terminal.
+        let inner_w = area.width.saturating_sub(SCOPES_CHROME);
+        let role_desired = self.longest_item_lens.0.saturating_add(4);
+        let scope_desired = self.longest_item_lens.1.saturating_add(1);
+
+        let (role_w, scope_w) = if role_desired.saturating_add(scope_desired) <= inner_w {
+            (
+                role_desired,
+                inner_w.saturating_sub(role_desired).max(MIN_COL_WIDTH),
             )
-            .header(
-                ["Role", "Scope"]
-                    .into_iter()
-                    .collect::<Row>()
-                    .style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))
-                    .height(1),
-            )
-            .row_highlight_style(if self.input_state == InputState::Scopes {
-                Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            // Cap the role column at ~40% so the scope path always has room.
+            let cap = (inner_w * 2 / 5).max(MIN_COL_WIDTH);
+            let role = role_desired.min(cap).max(MIN_COL_WIDTH);
+            let scope = inner_w.saturating_sub(role).max(MIN_COL_WIDTH);
+            (role, scope)
+        };
+
+        let rows = self.items.iter().map(|data| {
+            let role_text = format!(
+                "{} {}",
+                if data.enabled { ENABLED } else { DISABLED },
+                data.value.role
+            );
+            let scope_text = if let Some(scope_name) = data.value.scope_name.as_deref() {
+                format!("{scope_name}\n{}", data.value.scope)
             } else {
-                Style::default()
-            })
-            .highlight_spacing(HighlightSpacing::Always)
-            .block(Block::bordered().title("Scopes")),
+                data.value.scope.to_string()
+            };
+
+            let role_lines = wrap_text(&role_text, role_w);
+            let scope_lines = wrap_text(&scope_text, scope_w);
+            let height = u16::try_from(role_lines.len().max(scope_lines.len()))
+                .unwrap_or(MIN_ITEM_HEIGHT)
+                .max(MIN_ITEM_HEIGHT);
+
+            Row::new(vec![
+                Cell::from(role_lines.join("\n")),
+                Cell::from(scope_lines.join("\n")),
+            ])
+            .height(height)
+        });
+
+        frame.render_stateful_widget(
+            Table::new(rows, [Constraint::Length(role_w), Constraint::Min(scope_w)])
+                .header(
+                    ["Role", "Scope"]
+                        .into_iter()
+                        .collect::<Row>()
+                        .style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))
+                        .height(1),
+                )
+                .row_highlight_style(if self.input_state == InputState::Scopes {
+                    Style::default().add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                })
+                .highlight_spacing(HighlightSpacing::Always)
+                .block(Block::bordered().title("Scopes")),
             area,
             &mut self.table_state,
         );
+
+        // Always show a scrollbar so users know whether more rows exist
+        // off-screen. Render it inside the bordered block on the right edge.
+        if self.items.len() > 1 {
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("▲"))
+                    .end_symbol(Some("▼")),
+                area.inner(Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut self.scroll_state,
+            );
+        }
     }
 
     fn render_footer(&self, f: &mut Frame, area: Rect) {
@@ -413,4 +459,78 @@ fn column_widths(items: &BTreeSet<RoleAssignment>) -> Result<(u16, u16)> {
         role_len.try_into()?,
         scope_name_len.max(scope_len).try_into()?,
     ))
+}
+
+/// Wrap `text` to lines no wider than `width` columns, breaking on whitespace
+/// where possible and falling back to hard breaks for long unbroken runs (such
+/// as Azure scope paths).
+fn wrap_text(text: &str, width: u16) -> Vec<String> {
+    let width = usize::from(width.max(1));
+    let mut out = Vec::new();
+    for line in text.split('\n') {
+        if line.is_empty() {
+            out.push(String::new());
+            continue;
+        }
+        let mut current = String::new();
+        for word in line.split_inclusive(char::is_whitespace) {
+            if current.chars().count() + word.chars().count() <= width {
+                current.push_str(word);
+                continue;
+            }
+            if !current.is_empty() {
+                out.push(std::mem::take(&mut current));
+            }
+            // Hard-break any single token longer than the column width.
+            let mut chunk = String::new();
+            for ch in word.chars() {
+                if chunk.chars().count() == width {
+                    out.push(std::mem::take(&mut chunk));
+                }
+                chunk.push(ch);
+            }
+            current = chunk;
+        }
+        out.push(current);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wrap_text;
+
+    #[test]
+    fn wrap_short_text_unchanged() {
+        assert_eq!(wrap_text("hello", 80), vec!["hello".to_string()]);
+    }
+
+    #[test]
+    fn wrap_breaks_on_whitespace() {
+        assert_eq!(
+            wrap_text("one two three four", 8),
+            vec![
+                "one two ".to_string(),
+                "three ".to_string(),
+                "four".to_string()
+            ],
+        );
+    }
+
+    #[test]
+    fn wrap_hard_breaks_long_token() {
+        let scope = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg";
+        let wrapped = wrap_text(scope, 20);
+        assert!(wrapped.iter().all(|l| l.chars().count() <= 20));
+        assert_eq!(wrapped.concat(), scope);
+    }
+
+    #[test]
+    fn wrap_preserves_explicit_newlines() {
+        let wrapped = wrap_text("name\n/path/to/scope", 40);
+        assert_eq!(
+            wrapped,
+            vec!["name".to_string(), "/path/to/scope".to_string()]
+        );
+    }
 }
