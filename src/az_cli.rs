@@ -3,7 +3,7 @@ use azure_core::credentials::TokenCredential;
 use azure_identity::{new_executor, AzureCliCredential, AzureDeveloperCliCredential};
 use azure_identity_helpers::{
     azureauth_cli_credentials::AzureauthCliCredential,
-    chained_token_credential::ChainedTokenCredential, devicecode_credentials::DeviceCodeCredential,
+    chained_token_credential::ChainedTokenCredential, device_code_credential::DeviceCodeCredential,
 };
 use base64::prelude::{Engine, BASE64_STANDARD_NO_PAD};
 use serde_json::Value;
@@ -59,11 +59,13 @@ pub async fn get_token(scope: TokenScope) -> Result<String> {
         provider.add_source(AzureauthCliCredential::new(
             tenant_id,
             "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
-        )?);
+            None,
+        ));
     }
     provider.add_source(DeviceCodeCredential::new(
         "common",
         "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+        None,
     )?);
 
     let token = provider
