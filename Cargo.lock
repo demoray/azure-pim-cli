@@ -103,9 +103,9 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "azure-identity-helpers"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "399fbc22538f50d353e589700ee231883969021bdce218e753ee855b14b71357"
+checksum = "3e6446a64bf8bdc70460a7b0f53ae77a206327851d2f2b21d2ee6bfc988ca2ab"
 dependencies = [
  "async-lock",
  "async-trait",
