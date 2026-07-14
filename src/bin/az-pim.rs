@@ -1,4 +1,4 @@
-use anyhow::{ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use azure_pim_cli::{
     check_latest_version,
     interactive::{interactive_ui, Selected},
@@ -6,7 +6,7 @@ use azure_pim_cli::{
     models::{
         assignments::Assignment,
         roles::{Role, RoleAssignment, RolesExt},
-        scope::{Scope, ScopeBuilder},
+        scope::{Scope, ScopeBuilder, ScopeError},
     },
     ListFilter, PimClient,
 };
@@ -207,7 +207,7 @@ enum ActivateSubCommand {
         ///         },
         ///         {
         ///             "role": "Owner",
-        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000001"
+        ///             "scope_name": "My Subscription"
         ///         }
         ///     ]
         /// `
@@ -216,14 +216,18 @@ enum ActivateSubCommand {
         #[clap(
             long,
             conflicts_with = "config",
-            value_name = "ROLE=SCOPE",
-            value_parser = parse_key_val::<Role, Scope>,
+            value_name = "ROLE=SCOPE_OR_NAME",
+            value_parser = parse_key_val::<Role, ScopeSelector>,
             action = clap::ArgAction::Append
         )]
-        /// Specify a role to activate
+        /// Specify a role and its scope ID or display name
         ///
         /// Specify multiple times to include multiple key/value pairs
-        role: Option<Vec<(Role, Scope)>>,
+        role: Option<Vec<(Role, ScopeSelector)>>,
+
+        #[clap(long)]
+        /// Activate every matching assignment when a role and scope name are not unique
+        allow_multiple: bool,
 
         #[clap(long)]
         /// Duration to wait for the roles to be activated
@@ -287,8 +291,9 @@ impl ActivateSubCommand {
                 justification,
                 duration,
                 wait,
+                allow_multiple,
             } => {
-                let set = build_set(client, config, role, false).await?;
+                let set = build_set(client, config, role, false, allow_multiple).await?;
                 ensure!(!set.is_empty(), "no roles to activate");
                 client
                     .activate_role_assignment_set(&set, &justification, duration.into())
@@ -356,7 +361,7 @@ enum DeactivateSubCommand {
         ///         },
         ///         {
         ///             "role": "Owner",
-        ///             "scope": "/subscriptions/00000000-0000-0000-0000-000000000001"
+        ///             "scope_name": "My Subscription"
         ///         }
         ///     ]
         /// `
@@ -365,14 +370,18 @@ enum DeactivateSubCommand {
         #[clap(
             long,
             conflicts_with = "config",
-            value_name = "ROLE=SCOPE",
-            value_parser = parse_key_val::<Role, Scope>,
+            value_name = "ROLE=SCOPE_OR_NAME",
+            value_parser = parse_key_val::<Role, ScopeSelector>,
             action = clap::ArgAction::Append
         )]
-        /// Specify a role to deactivate
+        /// Specify a role and its scope ID or display name
         ///
         /// Specify multiple times to include multiple key/value pairs
-        role: Option<Vec<(Role, Scope)>>,
+        role: Option<Vec<(Role, ScopeSelector)>>,
+
+        #[clap(long)]
+        /// Deactivate every matching assignment when a role and scope name are not unique
+        allow_multiple: bool,
     },
     /// Deactivate roles interactively
     Interactive {},
@@ -390,8 +399,12 @@ impl DeactivateSubCommand {
                 let entry = roles.find_role(&role, &scope).context("role not found")?;
                 client.deactivate_role_assignment(&entry).await?;
             }
-            Self::Set { config, role } => {
-                let set = build_set(client, config, role, true).await?;
+            Self::Set {
+                config,
+                role,
+                allow_multiple,
+            } => {
+                let set = build_set(client, config, role, true, allow_multiple).await?;
                 client.deactivate_role_assignment_set(&set).await?;
             }
             Self::Interactive {} => {
@@ -783,11 +796,54 @@ where
 #[derive(Deserialize)]
 struct ElevateEntry {
     role: Role,
-    scope: Scope,
+    scope: Option<Scope>,
+    scope_name: Option<String>,
+}
+
+impl ElevateEntry {
+    fn into_role_selector(self) -> Result<(Role, ScopeSelector)> {
+        let selector = match (self.scope, self.scope_name) {
+            (Some(scope), None) => ScopeSelector::Scope(scope),
+            (None, Some(name)) if !name.is_empty() => ScopeSelector::Name(name),
+            (None, Some(_)) => bail!("scope_name must not be empty"),
+            (None, None) => bail!("either scope or scope_name must be specified"),
+            (Some(_), Some(_)) => bail!("scope and scope_name cannot both be specified"),
+        };
+        Ok((self.role, selector))
+    }
 }
 
 #[derive(Deserialize)]
 struct Roles(Vec<ElevateEntry>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ScopeSelector {
+    Scope(Scope),
+    Name(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+enum ScopeSelectorError {
+    #[error("scope or scope name must not be empty")]
+    Empty,
+    #[error(transparent)]
+    InvalidScope(#[from] ScopeError),
+}
+
+impl FromStr for ScopeSelector {
+    type Err = ScopeSelectorError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        if value.is_empty() {
+            return Err(ScopeSelectorError::Empty);
+        }
+        if value.starts_with('/') {
+            Ok(Self::Scope(value.parse()?))
+        } else {
+            Ok(Self::Name(value.to_string()))
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -838,8 +894,9 @@ async fn main() -> Result<()> {
 async fn build_set(
     client: &PimClient,
     config: Option<PathBuf>,
-    role: Option<Vec<(Role, Scope)>>,
+    role: Option<Vec<(Role, ScopeSelector)>>,
     active: bool,
+    allow_multiple: bool,
 ) -> Result<BTreeSet<RoleAssignment>> {
     let mut desired_roles = role.unwrap_or_default();
 
@@ -848,7 +905,7 @@ async fn build_set(
         let Roles(roles) =
             serde_json::from_reader(handle).context("unable to parse config file")?;
         for entry in roles {
-            desired_roles.push((entry.role, entry.scope));
+            desired_roles.push(entry.into_role_selector()?);
         }
     }
 
@@ -865,12 +922,160 @@ async fn build_set(
     };
 
     let mut to_add = BTreeSet::new();
-    for (role, scope) in desired_roles {
-        let entry = assignments
-            .find_role(&role, &scope)
-            .with_context(|| format!("role not found.  role:{role} scope:{scope}"))?;
-        to_add.insert(entry);
+    for (role, selector) in desired_roles {
+        to_add.extend(find_assignments(
+            &assignments,
+            &role,
+            &selector,
+            allow_multiple,
+        )?);
     }
 
     Ok(to_add)
+}
+
+fn find_assignments(
+    assignments: &BTreeSet<RoleAssignment>,
+    role: &Role,
+    selector: &ScopeSelector,
+    allow_multiple: bool,
+) -> Result<BTreeSet<RoleAssignment>> {
+    match selector {
+        ScopeSelector::Scope(scope) => assignments
+            .find_role(role, scope)
+            .with_context(|| format!("role not found.  role:{role} scope:{scope}"))
+            .map(|assignment| BTreeSet::from([assignment])),
+        ScopeSelector::Name(scope_name) => {
+            let matches = assignments
+                .iter()
+                .filter(|assignment| {
+                    assignment.role.0.eq_ignore_ascii_case(&role.0)
+                        && assignment
+                            .scope_name
+                            .as_deref()
+                            .is_some_and(|name| name.eq_ignore_ascii_case(scope_name))
+                })
+                .cloned()
+                .collect::<BTreeSet<_>>();
+
+            ensure!(
+                !matches.is_empty(),
+                "role not found.  role:{role} scope_name:{scope_name}"
+            );
+            if matches.len() > 1 && !allow_multiple {
+                let scopes = matches
+                    .iter()
+                    .map(|assignment| assignment.scope.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                bail!("multiple roles found.  role:{role} scope_name:{scope_name} scopes:{scopes}");
+            }
+
+            Ok(matches)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{find_assignments, ElevateEntry, Role, RoleAssignment, Scope, ScopeSelector};
+    use anyhow::{bail, Result};
+    use std::collections::BTreeSet;
+
+    fn assignment(role: &str, scope: &str, scope_name: &str) -> Result<RoleAssignment> {
+        Ok(RoleAssignment {
+            role: Role(role.to_string()),
+            scope: Scope::new(scope)?,
+            scope_name: Some(scope_name.to_string()),
+            role_definition_id: String::new(),
+            principal_id: None,
+            principal_type: None,
+            object: None,
+        })
+    }
+
+    #[test]
+    fn config_entry_accepts_scope_name() -> Result<()> {
+        let entry: ElevateEntry =
+            serde_json::from_str(r#"{"role":"Owner","scope_name":"My Subscription"}"#)?;
+
+        let (role, selector) = entry.into_role_selector()?;
+        assert_eq!(role, Role("Owner".to_string()));
+        assert_eq!(selector, ScopeSelector::Name("My Subscription".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn finds_assignment_by_scope_name_case_insensitively() -> Result<()> {
+        let expected = assignment(
+            "Owner",
+            "/subscriptions/00000000-0000-0000-0000-000000000000",
+            "My Subscription",
+        )?;
+        let assignments = BTreeSet::from([expected.clone()]);
+
+        let actual = find_assignments(
+            &assignments,
+            &Role("owner".to_string()),
+            &ScopeSelector::Name("my subscription".to_string()),
+            false,
+        )?;
+
+        assert_eq!(actual, BTreeSet::from([expected]));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_ambiguous_scope_name() -> Result<()> {
+        let assignments = BTreeSet::from([
+            assignment(
+                "Owner",
+                "/subscriptions/00000000-0000-0000-0000-000000000000",
+                "My Subscription",
+            )?,
+            assignment(
+                "Owner",
+                "/subscriptions/00000000-0000-0000-0000-000000000001",
+                "My Subscription",
+            )?,
+        ]);
+
+        let Err(error) = find_assignments(
+            &assignments,
+            &Role("Owner".to_string()),
+            &ScopeSelector::Name("My Subscription".to_string()),
+            false,
+        ) else {
+            bail!("ambiguous scope name unexpectedly matched");
+        };
+
+        assert!(error.to_string().contains("multiple roles found"));
+        Ok(())
+    }
+
+    #[test]
+    fn allows_multiple_assignments_with_the_same_scope_name() -> Result<()> {
+        let assignments = BTreeSet::from([
+            assignment(
+                "Owner",
+                "/subscriptions/00000000-0000-0000-0000-000000000000",
+                "My Subscription",
+            )?,
+            assignment(
+                "Owner",
+                "/subscriptions/00000000-0000-0000-0000-000000000001",
+                "My Subscription",
+            )?,
+        ]);
+
+        let matches = find_assignments(
+            &assignments,
+            &Role("Owner".to_string()),
+            &ScopeSelector::Name("My Subscription".to_string()),
+            true,
+        )?;
+
+        assert_eq!(matches, assignments);
+        Ok(())
+    }
 }
