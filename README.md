@@ -212,15 +212,18 @@ Options:
       --config <CONFIG>
           Path to a JSON config file containing a set of roles to activate
 
-          Example config file: ` [ { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000000" }, { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000001" } ] `
+          Example config file: ` [ { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000000" }, { "role": "Owner", "scope_name": "My Subscription" } ] `
 
       --quiet
           Only show errors
 
-      --role <ROLE=SCOPE>
-          Specify a role to activate
+      --role <ROLE=SCOPE_OR_NAME>
+          Specify a role and its scope ID or display name
 
           Specify multiple times to include multiple key/value pairs
+
+      --allow-multiple
+          Activate every matching assignment when a role and scope name are not unique
 
       --wait <WAIT>
           Duration to wait for the roles to be activated
@@ -368,7 +371,7 @@ Options:
       --config <CONFIG>
           Path to a JSON config file containing a set of roles to deactivate
 
-          Example config file: ` [ { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000000" }, { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000001" } ] `
+          Example config file: ` [ { "role": "Owner", "scope": "/subscriptions/00000000-0000-0000-0000-000000000000" }, { "role": "Owner", "scope_name": "My Subscription" } ] `
 
       --verbose...
           Increase logging verbosity.  Provide repeatedly to increase the verbosity
@@ -376,10 +379,13 @@ Options:
       --quiet
           Only show errors
 
-      --role <ROLE=SCOPE>
-          Specify a role to deactivate
+      --role <ROLE=SCOPE_OR_NAME>
+          Specify a role and its scope ID or display name
 
           Specify multiple times to include multiple key/value pairs
+
+      --allow-multiple
+          Deactivate every matching assignment when a role and scope name are not unique
 
   -h, --help
           Print help (see a summary with '-h')
