@@ -14,28 +14,28 @@ default-run = "az-pim"
 [dependencies]
 anyhow = { version ="1.0", default-features = false, features = ["std"] }
 azure-identity-helpers = { version = "0.2.0", default-features = false }
-azure_core = { version = "1.0", default-features = false, features = ["reqwest", "tokio"] }
+azure_core = { version = "1.1", default-features = false, features = ["reqwest", "tokio"] }
 azure_identity = { version = "1.0", default-features = false, features = ["tokio"] }
 base64 = { version = "0.23", default-features = false, features = ["std"] }
 clap = { version = "4.6", default-features = false, features = ["derive", "std", "help", "usage", "error-context", "color", "suggestions"] }
 clap_complete = { version = "4.6", default-features = false }
 derive_setters = { version = "0.1", default-features = false }
 exponential-backoff = { version = "2.1.0", default-features = false }
-futures = { version = "0.3.32", default-features = false }
-humantime = { version = "2.3", default-features = false }
+futures = { version = "0.3.34", default-features = false }
+humantime = { version = "2.4", default-features = false }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls"] }
 semver = { version = "1.0", default-features = false, features = ["std"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 thiserror = { version = "2.0", default-features = false }
-tokio = { version = "1.52", default-features = false, features = ["fs", "macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.53", default-features = false, features = ["fs", "macros", "rt-multi-thread", "sync", "time"] }
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
-uuid = { version = "1.23", default-features = false, features = ["v7"] }
+uuid = { version = "1.24", default-features = false, features = ["v7"] }
 
 [dev-dependencies]
-insta = { version = "1.47", default-features = false, features = ["json"] }
+insta = { version = "1.48", default-features = false, features = ["json"] }
 
 [target.'cfg(target_env = "musl")'.dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls-vendored"] }
