@@ -1,7 +1,7 @@
 use anyhow::{bail, ensure, Context, Result};
 use azure_pim_cli::{
     check_latest_version,
-    interactive::{interactive_ui, Selected},
+    interactive::{config_ui, interactive_ui, Selected},
     logging::{setup_logging, Verbosity},
     models::{
         assignments::Assignment,
@@ -19,9 +19,9 @@ use std::{
     collections::BTreeSet,
     error::Error,
     fmt::Write,
-    fs::{read, File},
-    io::stdout,
-    path::PathBuf,
+    fs::{read, File, OpenOptions},
+    io::{stdout, Write as _},
+    path::{Path, PathBuf},
     str::FromStr,
     time::Duration,
 };
@@ -51,6 +51,7 @@ impl Cmd {
             "az-pim"
             | "az-pim activate interactive"
             | "az-pim activate"
+            | "az-pim config"
             | "az-pim cleanup all"
             | "az-pim cleanup auto"
             | "az-pim cleanup orphaned-assignments"
@@ -78,6 +79,7 @@ impl Cmd {
             }
             "az-pim deactivate set" => Some(include_str!("../help/az-pim-deactivate-set.txt")),
             "az-pim init <SHELL>" => Some(include_str!("../help/az-pim-init.txt")),
+            "az-pim config create <FILE>" => Some(include_str!("../help/az-pim-config-create.txt")),
             "az-pim list" => Some(include_str!("../help/az-pim-list.txt")),
             "az-pim role assignment delete-orphaned-entries" => Some(include_str!(
                 "../help/az-pim-role-assignment-delete-orphan-entries.txt"
@@ -104,6 +106,12 @@ impl Cmd {
 
 #[derive(Subcommand)]
 enum SubCommand {
+    /// Build reusable role configuration files
+    Config {
+        #[clap(subcommand)]
+        cmd: ConfigSubCommand,
+    },
+
     /// List active or eligible assignments
     List {
         /// List active assignments
@@ -153,6 +161,67 @@ enum SubCommand {
     #[command(hide = true)]
     /// Generate the README.md file dynamically
     Readme,
+}
+
+#[derive(Subcommand)]
+enum ConfigSubCommand {
+    /// Select eligible roles interactively and save a JSON config file
+    ///
+    /// No roles are activated. Existing files are never overwritten.
+    /// Use the saved file with activate set or deactivate set --config.
+    Create {
+        /// Path for the new JSON config file
+        #[arg(value_name = "FILE", value_hint = ValueHint::FilePath)]
+        file: PathBuf,
+    },
+}
+
+impl ConfigSubCommand {
+    async fn run(self, client: &PimClient) -> Result<()> {
+        match self {
+            Self::Create { file } => {
+                ensure!(
+                    !file.try_exists()?,
+                    "config file already exists: {}",
+                    file.display()
+                );
+                let roles = client
+                    .list_eligible_role_assignments(None, Some(ListFilter::AsTarget))
+                    .await
+                    .context("unable to list eligible assignments")?;
+                ensure!(
+                    !roles.is_empty(),
+                    "no eligible roles available to configure"
+                );
+                if let Some(Selected { assignments, .. }) = config_ui(roles)? {
+                    write_config(&file, &assignments)?;
+                    info!("saved role config to {}", file.display());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn write_config(path: &Path, assignments: &BTreeSet<RoleAssignment>) -> Result<()> {
+    ensure!(!assignments.is_empty(), "no roles selected for config");
+    let entries = assignments
+        .iter()
+        .map(|assignment| ElevateEntry {
+            role: assignment.role.clone(),
+            scope: Some(assignment.scope.clone()),
+            scope_name: None,
+        })
+        .collect::<Vec<_>>();
+    let mut data =
+        serde_json::to_vec_pretty(&entries).context("unable to serialize role config")?;
+    data.push(b'\n');
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .with_context(|| format!("unable to create config file: {}", path.display()))?;
+    file.write_all(&data).context("unable to write config file")
 }
 
 #[derive(Subcommand)]
@@ -793,10 +862,12 @@ where
     serde_json::to_writer_pretty(stdout(), value).context("unable to serialize results")
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct ElevateEntry {
     role: Role,
+    #[serde(skip_serializing_if = "Option::is_none")]
     scope: Option<Scope>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     scope_name: Option<String>,
 }
 
@@ -876,6 +947,7 @@ async fn main() -> Result<()> {
             output(&roles)
         }
         SubCommand::Activate { cmd } => cmd.run(&client).await,
+        SubCommand::Config { cmd } => cmd.run(&client).await,
         SubCommand::Deactivate { cmd } => cmd.run(&client).await,
         SubCommand::Role { cmd } => match cmd {
             RoleSubCommand::Assignment { cmd } => cmd.run(&client).await,
@@ -978,9 +1050,85 @@ fn find_assignments(
 
 #[cfg(test)]
 mod tests {
-    use super::{find_assignments, ElevateEntry, Role, RoleAssignment, Scope, ScopeSelector};
+    use super::{
+        find_assignments, write_config, Cmd, ConfigSubCommand, ElevateEntry, Role, RoleAssignment,
+        Roles, Scope, ScopeSelector, SubCommand,
+    };
     use anyhow::{bail, Result};
-    use std::collections::BTreeSet;
+    use clap::{CommandFactory, Parser};
+    use std::{
+        collections::BTreeSet,
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    struct ConfigPath(PathBuf);
+
+    impl ConfigPath {
+        fn new() -> Self {
+            Self(std::env::temp_dir().join(format!("az-pim-config-{}.json", uuid::Uuid::now_v7())))
+        }
+    }
+
+    impl Drop for ConfigPath {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn parses_config_create_command() -> Result<()> {
+        Cmd::command().debug_assert();
+        let cmd = Cmd::try_parse_from(["az-pim", "config", "create", "roles.json"])?;
+        assert!(matches!(
+            cmd.command,
+            SubCommand::Config {
+                cmd: ConfigSubCommand::Create { file }
+            } if file == Path::new("roles.json")
+        ));
+        assert!(Cmd::try_parse_from(["az-pim", "config", "create"]).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn saved_config_round_trips_with_exact_scopes() -> Result<()> {
+        let path = ConfigPath::new();
+        let assignments = BTreeSet::from([
+            assignment("Owner", "/subscriptions/one", "Same name")?,
+            assignment("Owner", "/subscriptions/two", "Same name")?,
+        ]);
+        write_config(&path.0, &assignments)?;
+        let data = fs::read_to_string(&path.0)?;
+        assert!(!data.contains("scope_name"));
+        assert!(!data.contains("principal"));
+        assert!(data.ends_with('\n'));
+        let Roles(entries) = serde_json::from_str(&data)?;
+        let mut matched = BTreeSet::new();
+        for entry in entries {
+            let (role, selector) = entry.into_role_selector()?;
+            matched.extend(find_assignments(&assignments, &role, &selector, false)?);
+        }
+        assert_eq!(matched, assignments);
+        Ok(())
+    }
+
+    #[test]
+    fn config_writer_does_not_overwrite_existing_files() -> Result<()> {
+        let path = ConfigPath::new();
+        let original = b"existing config";
+        fs::write(&path.0, original)?;
+        let assignments = BTreeSet::from([assignment("Owner", "/subscriptions/one", "One")?]);
+        assert!(write_config(&path.0, &assignments).is_err());
+        assert_eq!(fs::read(&path.0)?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_config_selection_does_not_create_file() {
+        let path = ConfigPath::new();
+        assert!(write_config(&path.0, &BTreeSet::new()).is_err());
+        assert!(!path.0.exists());
+    }
 
     fn assignment(role: &str, scope: &str, scope_name: &str) -> Result<RoleAssignment> {
         Ok(RoleAssignment {

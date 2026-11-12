@@ -1,0 +1,12 @@
+$ az-pim config create ./roles.json
+# Use Up/Down to move, Space to select roles, and Enter to save.
+# Press Esc to cancel without creating a file.
+$ cat roles.json
+[
+  {
+    "role": "Owner",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000"
+  }
+]
+$ az-pim activate set "continued development" --config ./roles.json
+$ az-pim deactivate set --config ./roles.json
