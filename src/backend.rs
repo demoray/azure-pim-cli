@@ -202,7 +202,7 @@ impl<'a> RequestBuilder<'a> {
             validate,
         } = self;
 
-        let scope = scope.map(|x| x.0).unwrap_or_default();
+        let scope = scope.map_or_default(|x| x.0);
         let extra = extra.unwrap_or_default();
         let url = format!(
             "https://management.azure.com{scope}/providers/Microsoft.Authorization/{}{extra}",
