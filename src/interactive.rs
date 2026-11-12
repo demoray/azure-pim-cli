@@ -1,5 +1,5 @@
 use crate::models::roles::RoleAssignment;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use ratatui::{
     crossterm::{
         event::{
@@ -51,6 +51,8 @@ enum InputState {
 }
 
 struct App {
+    title: &'static str,
+    help: &'static str,
     duration: Option<u64>,
     input_state: InputState,
     table_state: TableState,
@@ -68,6 +70,8 @@ impl App {
         duration: Option<u64>,
     ) -> Result<Self> {
         Ok(Self {
+            title: TITLE_TEXT,
+            help: ALL_HELP,
             duration,
             input_state: if justification.is_none() {
                 InputState::Scopes
@@ -94,6 +98,29 @@ impl App {
             if let Some(item) = self.items.get_mut(i) {
                 item.enabled = !item.enabled;
             }
+        }
+    }
+
+    fn change_section(&mut self, forward: bool) {
+        let sections = [
+            (InputState::Justification, self.justification.is_some()),
+            (InputState::Scopes, true),
+            (InputState::Duration, self.duration.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(state, visible)| visible.then_some(state))
+        .collect::<Vec<_>>();
+        let current = sections
+            .iter()
+            .position(|state| *state == self.input_state)
+            .unwrap_or(0);
+        let next = if forward {
+            (current + 1) % sections.len()
+        } else {
+            (current + sections.len() - 1) % sections.len()
+        };
+        if let Some(state) = sections.get(next) {
+            self.input_state = *state;
         }
     }
 
@@ -175,7 +202,7 @@ impl App {
         let Some(title) = rects.next() else {
             return;
         };
-        Self::render_title(f, *title);
+        self.render_title(f, *title);
 
         if self.justification.is_some() {
             let Some(justification) = rects.next() else {
@@ -219,9 +246,9 @@ impl App {
         );
     }
 
-    fn render_title(frame: &mut Frame, area: Rect) {
+    fn render_title(&self, frame: &mut Frame, area: Rect) {
         frame.render_widget(
-            Paragraph::new(TITLE_TEXT)
+            Paragraph::new(self.title)
                 .style(Style::default().add_modifier(Modifier::BOLD))
                 .alignment(Alignment::Center),
             area,
@@ -339,12 +366,13 @@ impl App {
     fn render_footer(&self, f: &mut Frame, area: Rect) {
         f.render_widget(
             Paragraph::new(format!(
-                "{}\n{ALL_HELP}",
+                "{}\n{}",
                 match self.input_state {
                     InputState::Duration => DURATION_TEXT,
                     InputState::Justification => JUSTIFICATION_TEXT,
                     InputState::Scopes => SCOPE_TEXT,
-                }
+                },
+                self.help
             ))
             .style(Style::new())
             .centered()
@@ -368,15 +396,8 @@ impl App {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match (self.input_state, key.code) {
-                        (InputState::Justification, Tab) | (InputState::Duration, BackTab) => {
-                            self.input_state = InputState::Scopes;
-                        }
-                        (InputState::Scopes, Tab) | (InputState::Justification, BackTab) => {
-                            self.input_state = InputState::Duration;
-                        }
-                        (InputState::Duration, Tab) | (InputState::Scopes, BackTab) => {
-                            self.input_state = InputState::Justification;
-                        }
+                        (_, Tab) => self.change_section(true),
+                        (_, BackTab) => self.change_section(false),
                         (InputState::Justification, Char(c)) => {
                             if let Some(justification) = &mut self.justification {
                                 justification.push(c);
@@ -424,6 +445,25 @@ pub fn interactive_ui(
     justification: Option<String>,
     duration: Option<u64>,
 ) -> Result<Option<Selected>> {
+    run_ui(App::new(items, justification, duration)?)
+}
+
+pub fn config_ui(items: BTreeSet<RoleAssignment>) -> Result<Option<Selected>> {
+    run_ui(config_app(items)?)
+}
+
+fn config_app(items: BTreeSet<RoleAssignment>) -> Result<App> {
+    ensure!(
+        !items.is_empty(),
+        "no eligible roles available to configure"
+    );
+    let mut app = App::new(items, None, None)?;
+    app.title = "Build Azure PIM role config";
+    app.help = "Enter to save config | Esc to cancel";
+    Ok(app)
+}
+
+fn run_ui(app: App) -> Result<Option<Selected>> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = stdout();
@@ -432,7 +472,6 @@ pub fn interactive_ui(
     let mut terminal = Terminal::new(backend)?;
 
     // create app and run it
-    let app = App::new(items, justification, duration)?;
     let res = app.run(&mut terminal);
 
     // restore terminal
@@ -498,7 +537,84 @@ fn wrap_text(text: &str, width: u16) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::wrap_text;
+    use super::{config_app, wrap_text, App, InputState};
+    use crate::models::{
+        roles::{Role, RoleAssignment},
+        scope::Scope,
+    };
+    use anyhow::Result;
+    use ratatui::{backend::TestBackend, Terminal};
+    use std::collections::BTreeSet;
+
+    fn config_roles() -> Result<BTreeSet<RoleAssignment>> {
+        Ok(BTreeSet::from([RoleAssignment {
+            role: Role("Owner".to_string()),
+            scope: Scope::new("/subscriptions/test")?,
+            scope_name: Some("My Subscription".to_string()),
+            role_definition_id: String::new(),
+            principal_id: None,
+            principal_type: None,
+            object: None,
+        }]))
+    }
+
+    #[test]
+    fn config_picker_requires_selection_and_stays_on_scopes() -> Result<()> {
+        let mut app = config_app(config_roles()?)?;
+        app.check();
+        assert_eq!(app.warnings, ["At least one role must be selected"]);
+        app.change_section(true);
+        assert!(app.input_state == InputState::Scopes);
+        app.change_section(false);
+        assert!(app.input_state == InputState::Scopes);
+        app.toggle_current();
+        app.check();
+        assert_eq!(app.warnings, Vec::<String>::new());
+        app.toggle_current();
+        app.check();
+        assert_eq!(app.warnings, ["At least one role must be selected"]);
+        Ok(())
+    }
+
+    #[test]
+    fn config_picker_has_save_labels_and_no_activation_fields() -> Result<()> {
+        let mut app = config_app(config_roles()?)?;
+        let mut terminal = Terminal::new(TestBackend::new(100, 25))?;
+        terminal.draw(|frame| app.draw(frame))?;
+        let text = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(ratatui::buffer::Cell::symbol)
+            .collect::<String>();
+        assert!(text.contains("Build Azure PIM role config"));
+        assert!(text.contains("Enter to save config | Esc to cancel"));
+        assert!(!text.contains("Enter to activate"));
+        assert!(!text.contains("Justification"));
+        assert!(!text.contains("Duration"));
+        Ok(())
+    }
+
+    #[test]
+    fn config_picker_rejects_empty_roles() {
+        assert!(config_app(BTreeSet::new()).is_err());
+    }
+
+    #[test]
+    fn activation_picker_retains_all_sections() -> Result<()> {
+        let mut app = App::new(config_roles()?, Some(String::new()), Some(480))?;
+        assert!(app.input_state == InputState::Justification);
+        app.change_section(true);
+        assert!(app.input_state == InputState::Scopes);
+        app.change_section(true);
+        assert!(app.input_state == InputState::Duration);
+        app.change_section(true);
+        assert!(app.input_state == InputState::Justification);
+        app.change_section(false);
+        assert!(app.input_state == InputState::Duration);
+        Ok(())
+    }
 
     #[test]
     fn wrap_short_text_unchanged() {

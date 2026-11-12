@@ -6,6 +6,7 @@ Unofficial CLI to list and enable Azure Privileged Identity Management (PIM) rol
 Usage: az-pim [OPTIONS] <COMMAND>
 
 Commands:
+  config      Build reusable role configuration files
   list        List active or eligible assignments
   activate    Activate eligible role assignments
   deactivate  Deactivate eligible role assignments
@@ -27,6 +28,68 @@ Options:
           Print version
 
 ```
+## az-pim config
+
+```
+Build reusable role configuration files
+
+Usage: config [OPTIONS] <COMMAND>
+
+Commands:
+  create  Select eligible roles interactively and save a JSON config file
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help
+
+```
+### az-pim config create <FILE>
+
+```
+Select eligible roles interactively and save a JSON config file
+
+No roles are activated. Existing files are never overwritten. Use the saved file with activate set or deactivate set --config.
+
+Usage: create [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>
+          Path for the new JSON config file
+
+Options:
+      --verbose...
+          Increase logging verbosity.  Provide repeatedly to increase the verbosity
+
+      --quiet
+          Only show errors
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+#### Example Usage
+
+```
+$ az-pim config create ./roles.json
+# Use Up/Down to move, Space to select roles, and Enter to save.
+# Press Esc to cancel without creating a file.
+$ cat roles.json
+[
+  {
+    "role": "Owner",
+    "scope": "/subscriptions/00000000-0000-0000-0000-000000000000"
+  }
+]
+$ az-pim activate set "continued development" --config ./roles.json
+$ az-pim deactivate set --config ./roles.json
+```
+
 ## az-pim list
 
 ```
