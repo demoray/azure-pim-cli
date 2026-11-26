@@ -3,7 +3,6 @@ authors = ["Brian Caswell <bcaswell@gmail.com>"]
 description = "Unofficial CLI to list and enable Azure Privileged Identity Management (PIM) roles"
 documentation = "https://docs.rs/azure-pim-cli"
 edition = "2021"
-homepage = "https://github.com/demoray/azure-pim-cli"
 keywords = ["azure"]
 license = "MIT"
 name = "azure-pim-cli"
@@ -22,7 +21,7 @@ clap_complete = { version = "4.6", default-features = false }
 derive_setters = { version = "0.1", default-features = false }
 exponential-backoff = { version = "2.1.1", default-features = false }
 futures = { version = "0.3.34", default-features = false }
-humantime = { version = "2.4", default-features = false }
+jiff = { version = "1.0", default-features = false, features = ["std"] }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls"] }
 semver = { version = "1.0", default-features = false, features = ["std"] }
