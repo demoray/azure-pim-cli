@@ -12,7 +12,7 @@ use azure_pim_cli::{
 };
 use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Shell};
-use humantime::Duration as HumanDuration;
+use jiff::{fmt::friendly::SpanParser, SpanRelativeTo};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
@@ -28,6 +28,13 @@ use std::{
 use tracing::{debug, info};
 
 const DEFAULT_DURATION: &str = "8 hours";
+
+fn parse_duration(input: &str) -> Result<Duration, jiff::Error> {
+    SpanParser::new()
+        .parse_span(input.trim())?
+        .to_duration(SpanRelativeTo::days_are_24_hours())?
+        .try_into()
+}
 
 #[derive(Parser)]
 #[command(version, disable_help_subcommand = true, name = "az-pim")]
@@ -234,17 +241,17 @@ enum ActivateSubCommand {
         /// Justification for the request
         justification: String,
 
-        #[clap(long, default_value = DEFAULT_DURATION)]
+        #[clap(long, default_value = DEFAULT_DURATION, value_parser = parse_duration)]
         /// Duration for the role to be active
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
-        duration: HumanDuration,
+        duration: Duration,
 
-        #[clap(long)]
+        #[clap(long, value_parser = parse_duration)]
         /// Duration to wait for the roles to be activated
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
-        wait: Option<HumanDuration>,
+        wait: Option<Duration>,
 
         #[clap(flatten)]
         scope: ScopeBuilder,
@@ -258,11 +265,11 @@ enum ActivateSubCommand {
         /// Justification for the request
         justification: String,
 
-        #[clap(long, default_value = DEFAULT_DURATION)]
+        #[clap(long, default_value = DEFAULT_DURATION, value_parser = parse_duration)]
         /// Duration for the role to be active
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
-        duration: HumanDuration,
+        duration: Duration,
 
         #[clap(long, value_hint = ValueHint::FilePath)]
         /// Path to a JSON config file containing a set of roles to activate
@@ -298,11 +305,11 @@ enum ActivateSubCommand {
         /// Activate every matching assignment when a role and scope name are not unique
         allow_multiple: bool,
 
-        #[clap(long)]
+        #[clap(long, value_parser = parse_duration)]
         /// Duration to wait for the roles to be activated
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
-        wait: Option<HumanDuration>,
+        wait: Option<Duration>,
     },
 
     /// Activate roles interactively
@@ -311,17 +318,17 @@ enum ActivateSubCommand {
         /// Justification for the request
         justification: Option<String>,
 
-        #[clap(long, default_value = DEFAULT_DURATION)]
+        #[clap(long, default_value = DEFAULT_DURATION, value_parser = parse_duration)]
         /// Duration for the role to be active
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
-        duration: HumanDuration,
+        duration: Duration,
 
-        #[clap(long)]
+        #[clap(long, value_parser = parse_duration)]
         /// Duration to wait for the roles to be activated
         ///
         /// Examples include '8h', '8 hours', '1h30m', '1 hour 30 minutes', '1h30m'
-        wait: Option<HumanDuration>,
+        wait: Option<Duration>,
     },
 }
 
@@ -344,14 +351,12 @@ impl ActivateSubCommand {
                     .find_role(&role, &scope)
                     .with_context(|| format!("role not found ({role:?} {scope:?})"))?;
                 client
-                    .activate_role_assignment(&entry, &justification, duration.into())
+                    .activate_role_assignment(&entry, &justification, duration)
                     .await?;
 
                 if let Some(wait) = wait {
                     let assignments = [entry].into();
-                    client
-                        .wait_for_role_activation(&assignments, wait.into())
-                        .await?;
+                    client.wait_for_role_activation(&assignments, wait).await?;
                 }
             }
             Self::Set {
@@ -365,11 +370,11 @@ impl ActivateSubCommand {
                 let set = build_set(client, config, role, false, allow_multiple).await?;
                 ensure!(!set.is_empty(), "no roles to activate");
                 client
-                    .activate_role_assignment_set(&set, &justification, duration.into())
+                    .activate_role_assignment_set(&set, &justification, duration)
                     .await?;
 
                 if let Some(wait) = wait {
-                    client.wait_for_role_activation(&set, wait.into()).await?;
+                    client.wait_for_role_activation(&set, wait).await?;
                 }
             }
             Self::Interactive {
@@ -395,9 +400,7 @@ impl ActivateSubCommand {
                         .await?;
 
                     if let Some(wait) = wait {
-                        client
-                            .wait_for_role_activation(&assignments, wait.into())
-                            .await?;
+                        client.wait_for_role_activation(&assignments, wait).await?;
                     }
                 }
             }
@@ -1051,8 +1054,8 @@ fn find_assignments(
 #[cfg(test)]
 mod tests {
     use super::{
-        find_assignments, write_config, Cmd, ConfigSubCommand, ElevateEntry, Role, RoleAssignment,
-        Roles, Scope, ScopeSelector, SubCommand,
+        find_assignments, write_config, ActivateSubCommand, Cmd, ConfigSubCommand, ElevateEntry,
+        Role, RoleAssignment, Roles, Scope, ScopeSelector, SubCommand,
     };
     use anyhow::{bail, Result};
     use clap::{CommandFactory, Parser};
@@ -1060,7 +1063,87 @@ mod tests {
         collections::BTreeSet,
         fs,
         path::{Path, PathBuf},
+        time::Duration,
     };
+
+    fn activation_commands() -> [Vec<&'static str>; 3] {
+        [
+            vec!["az-pim", "activate", "role", "Owner", "testing"],
+            vec!["az-pim", "activate", "set", "testing"],
+            vec!["az-pim", "activate", "interactive"],
+        ]
+    }
+
+    fn activation_durations(cmd: &Cmd) -> Result<(Duration, Option<Duration>)> {
+        match cmd.command {
+            SubCommand::Activate {
+                cmd:
+                    ActivateSubCommand::Role { duration, wait, .. }
+                    | ActivateSubCommand::Set { duration, wait, .. }
+                    | ActivateSubCommand::Interactive { duration, wait, .. },
+            } => Ok((duration, wait)),
+            _ => bail!("expected activation command"),
+        }
+    }
+
+    #[test]
+    fn parses_activation_durations() -> Result<()> {
+        let cases = [
+            ("8h", Duration::from_hours(8)),
+            ("8 hours", Duration::from_hours(8)),
+            ("1h30m", Duration::from_mins(90)),
+            ("1 hour 30 minutes", Duration::from_mins(90)),
+            (" 1h30m ", Duration::from_mins(90)),
+            ("1.5h", Duration::from_mins(90)),
+            ("0.001s", Duration::from_millis(1)),
+            ("1ns", Duration::from_nanos(1)),
+            ("0s", Duration::ZERO),
+            ("1 day", Duration::from_hours(24)),
+            ("1w2d", Duration::from_hours(9 * 24)),
+        ];
+        for command in activation_commands() {
+            for (input, expected) in cases {
+                let mut args = command.clone();
+                args.extend(["--duration", input, "--wait", input]);
+                let actual = activation_durations(&Cmd::try_parse_from(args)?)?;
+                assert_eq!(actual, (expected, Some(expected)), "{command:?}: {input}");
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn activation_duration_defaults_are_unchanged() -> Result<()> {
+        for command in activation_commands() {
+            let actual = activation_durations(&Cmd::try_parse_from(command)?)?;
+            assert_eq!(actual, (Duration::from_hours(8), None));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_activation_durations() {
+        for command in activation_commands() {
+            for option in ["--duration", "--wait"] {
+                for input in [
+                    "",
+                    "not a duration",
+                    "-1h",
+                    "1ns ago",
+                    "1 month",
+                    "1 year",
+                    "18446744073709551616s",
+                ] {
+                    let mut args = command.iter().map(ToString::to_string).collect::<Vec<_>>();
+                    args.push(format!("{option}={input}"));
+                    let Err(error) = Cmd::try_parse_from(args) else {
+                        panic!("{command:?}: {option} accepted {input:?}");
+                    };
+                    assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
+                }
+            }
+        }
+    }
 
     struct ConfigPath(PathBuf);
 
